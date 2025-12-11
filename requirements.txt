@@ -1,5 +1,8 @@
 streamlit==1.31.0
 pandas               
+numpy
 matplotlib
 seaborn
 plotly
+folium==0.14.0       
+streamlit-folium==0.16.0
