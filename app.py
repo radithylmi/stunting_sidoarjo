@@ -237,4 +237,36 @@ print(f"2. **Fase Kritis:** Kelompok usia **{umur_data_sorted.iloc[0]['kelompok_
 
 print("3. **Diagnostik Z-Score:** Plot menunjukkan sebaran status gizi, membantu mengidentifikasi balita yang menderita Stunting (TB/U < -2) atau Gizi Kurang (BB/U < -2) secara visual.")
 
+#  Import library & Load Data
+import pandas as pd
+import plotly.express as px
+df = pd.read_csv('/content/data_skrinning_stunting(1).csv') 
 
+#  Pembuatan Figure Awal
+# Contoh: fig_dashboard dibuat dari data stunting
+fig_dashboard = px.histogram(df, x='status_tbu', title='Status Gizi Tinggi Badan menurut Usia')
+
+
+# Penambahan Konfigurasi/Elemen (termasuk Anotasi)
+# Kode Anotasi Anda Diletakkan di sini:
+fig_dashboard.add_annotation(
+    x=0.5, 
+    y=0.5, 
+    xref="paper", 
+    yref="paper", 
+    text="**Teks Anotasi: Data Skrining Stunting 2025**", 
+    showarrow=False, 
+    font=dict(
+        size=18, 
+        color="darkgray", 
+        family="Arial, sans-serif"
+    ),
+    xanchor='center',
+    yanchor='middle',
+    opacity=0.5 
+)
+
+# MENAMPILKAN FIGURE
+# Baris ini harus diletakkan sebagai langkah terakhir
+# setelah semua modifikasi selesai.
+fig_dashboard.show()
