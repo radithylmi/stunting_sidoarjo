@@ -1,13 +1,14 @@
 import streamlit as st
 import pandas as pd
-import io
+import numpy as np
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
+import io
 
 # --- Konfigurasi Halaman Streamlit ---
-# st.set_page_config harus menjadi baris pertama setelah import
-st.set_page_config(layout="wide", page_title="Dashboard Skrining Stunting")
-st.title("📊 Dashboard Kecerdasan Bisnis: Analisis Skrining Stunting Sidoarjo")
+st.set_page_config(layout="wide", page_title="Dashboard Analisis Stunting")
+st.title("📊 Dashboard Analisis Skrining Stunting (Subplot Layout)")
 st.markdown("---")
 
 
@@ -15,8 +16,8 @@ st.markdown("---")
 
 @st.cache_data
 def load_data():
-    """Memuat data dari CSV snippet yang disediakan."""
-    # DATA SNIPPET DARI FILE YANG ANDA UPLOAD DITEMPATKAN DI SINI
+    """Memuat dan membersihkan data."""
+    # DATA SNIPPET dari file CSV yang Anda unggah
     data_csv_snippet = """
 tgl_pengambilan_data,nik_balita,nama_balita,tgl_lahir_balita,jenis_kelamin_balita,umur_balita,bb_balita_lahir,tb_balita_lahir,bb_balita,tb_balita,zsc_tbu,zsc_bbtb,zsc_bbu,stunting_balita,status_tbu,status_bbtb,status_bbu,nama_responden,nik_responden,no_hp_responden,tgl_lahir_responden,nama_puskesmas,nama_kecamatan,nama_desa,rt,rw
 1/3/2025,s0:1wNMg/i1akEl3uEbwDKvZpk6d0IcoGhYprlQsOW47UX659YuPs9PfSCgOyY=,s0:4ZOaffhqPfJ76xo7CblKY2D4SKPaWyj3kZEaMmo5jDSsl8vj20AIXNg1aIJjmTYx,s0:aoBbahZAiUabN3Li0y09myqA2Y01j1O3eKC3Qx+lkeB0T+QlryI=,Laki - Laki,2 Tahun 5 Bulan,1.4,39,10,84,-2.158,-1.695,-2.324,Ya,Pendek,Gizi Baik,BB Kurang,s0:iLFdMgDCkN31FFEsZb/oKlyPlSfGOyBnJmw1fg...,s0:GMgpcLMH9uog+gcuCRkN2hxl7jZ3nBgvp4SfhSi5gak5tg==,s0:Z0DSH4HK+vD1VokPofbaOPdpj2kmTWG8E+dqfIKJ8ULS3iRZw/g4TXlvzOI=,s0:o9mJpfL7c3A94OGkVXN8nIk4wIBm+DEKrJI/AaFsKdBDTC9r5rP/PA==,s0:XEU9oIW2D5WaIc3JmfJq7fVV6lcodGNmP8xbqV0RjkI+hW8gSBU=,Puskesmas Porong,Porong,Pamotan,05,02
@@ -24,122 +25,199 @@ tgl_pengambilan_data,nik_balita,nama_balita,tgl_lahir_balita,jenis_kelamin_balit
 """
     df = pd.read_csv(io.StringIO(data_csv_snippet))
     
-    # Konversi kolom Z-Score ke numerik (wajib)
+    # Mengubah nama kolom yang panjang
+    df.columns = [col.lower().replace(' ', '_').replace('.', '') for col in df.columns]
+
+    # --- DATA CLEANING & FEATURE ENGINEERING ---
+    df['is_stunting'] = df['stunting_balita'].apply(lambda x: 1 if x == 'Ya' else 0)
+
+    # Fungsi categorisasi umur
+    def categorize_age(umur_str):
+        if pd.isna(umur_str) or not isinstance(umur_str, str):
+            return 'E. > 60 Bulan' # Treat unknown/NaN as last category
+        
+        parts = umur_str.split(' ')
+        tahun = 0
+        bulan = 0
+        
+        # Simple parsing for 'X Tahun Y Bulan'
+        try:
+            if 'Tahun' in parts and 'Bulan' in parts:
+                tahun = int(parts[parts.index('Tahun') - 1])
+                bulan = int(parts[parts.index('Bulan') - 1])
+            else:
+                 # Fallback parsing for unexpected formats
+                 if 'Tahun' in parts:
+                     tahun = int(parts[parts.index('Tahun') - 1])
+                 if 'Bulan' in parts:
+                     bulan = int(parts[parts.index('Bulan') - 1])
+        except (ValueError, IndexError):
+            pass
+            
+        total_bulan = tahun * 12 + bulan
+        
+        if total_bulan <= 12: return 'A. 0-12 Bulan (Bayi)'
+        elif total_bulan <= 24: return 'B. 13-24 Bulan (Tahun Kritis)'
+        elif total_bulan <= 36: return 'C. 25-36 Bulan'
+        elif total_bulan <= 60: return 'D. 37-60 Bulan'
+        else: return 'E. > 60 Bulan'
+
+    df['kelompok_umur'] = df['umur_balita'].apply(categorize_age)
+
+    # Cleaning data kontinu dan Z-Score
+    for col in ['bb_balita_lahir', 'tb_balita_lahir']:
+        df[col] = df[col].replace(0, np.nan)
+    
+    # Konversi Z-Score ke numerik dan hapus baris yang hilang pada kolom krusial
     for col in ['zsc_tbu', 'zsc_bbu', 'zsc_bbtb']:
         df[col] = pd.to_numeric(df[col], errors='coerce')
         
-    df.dropna(subset=['zsc_tbu', 'zsc_bbu', 'zsc_bbtb', 'nama_kecamatan'], inplace=True)
+    df.dropna(subset=['nama_kecamatan', 'stunting_balita', 'zsc_tbu', 'zsc_bbu'], inplace=True)
+    
     return df
 
 df = load_data()
 
+# Cek data setelah load
 if df.empty:
-    st.error("⚠️ Gagal memuat data atau data kosong setelah preprocessing. Harap periksa format data yang Anda sediakan.")
+    st.error("⚠️ Data tidak berhasil dimuat atau terlalu sedikit untuk ditampilkan setelah cleaning.")
     st.stop()
 
-# --- 2. DATA AGREGASI ---
-kecamatan_data_sorted = df.groupby('nama_kecamatan').size().reset_index(name='Jumlah Balita').sort_values(by='Jumlah Balita', ascending=False)
-stunting_counts = df['stunting_balita'].value_counts().reset_index(name='Jumlah').rename(columns={'index': 'Status'})
 
+# --- 2. ANALISIS PERHITUNGAN UNTUK DASHBOARD ---
 
-# --- 3. KEY PERFORMANCE INDICATOR (KPI) ---
-
-st.subheader("🔑 Key Performance Indicator (KPI)")
-kpi_col1, kpi_col2, kpi_col3 = st.columns(3)
-
+# Prevalensi
 total_balita = len(df)
-stunting_count = stunting_counts[stunting_counts['Status'] == 'Ya']['Jumlah'].sum() if 'Ya' in stunting_counts['Status'].values else 0
-persen_stunting = (stunting_count / total_balita) * 100 if total_balita > 0 else 0
+prevalensi_stunting = (df['is_stunting'].sum() / total_balita) * 100 if total_balita > 0 else 0
 
-kpi_col1.metric("Total Balita Tervisi", total_balita)
-kpi_col2.metric("Persentase Stunting", f"{persen_stunting:.2f}%")
-kpi_col3.metric("Kecamatan Fokus Utama", kecamatan_data_sorted.iloc[0]['nama_kecamatan'], delta=f"{kecamatan_data_sorted.iloc[0]['Jumlah Balita']} Anak")
+# Segmentasi Kecamatan
+kecamatan_data = df.groupby('nama_kecamatan')['is_stunting'].agg(
+    total_kasus='sum',
+    total_populasi='count'
+).reset_index()
+kecamatan_data['prevalensi'] = (kecamatan_data['total_kasus'] / kecamatan_data['total_populasi']) * 100
+kecamatan_data_sorted = kecamatan_data.sort_values(by='prevalensi', ascending=False)
+
+# Segmentasi Umur
+umur_data = df.groupby('kelompok_umur')['is_stunting'].agg(
+    total_kasus='sum',
+    total_populasi='count'
+).reset_index()
+umur_data['prevalensi'] = (umur_data['total_kasus'] / umur_data['total_populasi']) * 100
+umur_data_sorted = umur_data.sort_values(by='kelompok_umur', ascending=True)
 
 
-# --- 4. VISUALISASI UTAMA (MENGGUNAKAN st.columns) ---
+# --- 3. VISUALISASI PLOTLY (KOMPONEN) ---
 
-st.markdown("---")
-st.subheader("📈 Visualisasi Utama")
+# 3.1. Area Prioritas (Kecamatan) - Bar Chart Horizontal Interaktif
+top_10_kecamatan = kecamatan_data_sorted.head(10).sort_values(by='prevalensi', ascending=True)
+fig_kecamatan = px.bar(
+    top_10_kecamatan,
+    x='prevalensi', y='nama_kecamatan', orientation='h', 
+    color='prevalensi', color_continuous_scale=px.colors.sequential.Reds,
+    text=top_10_kecamatan['prevalensi'].round(1).astype(str) + '%' 
+)
+fig_kecamatan.update_traces(textposition='outside')
+fig_kecamatan.update_layout(showlegend=False)
 
-# Baris 1: Bar Plot dan Pie Chart
-col_vis_1, col_vis_2 = st.columns([0.65, 0.35])
+# 3.2. Fase Kritis (Kelompok Umur) - Bar Chart Vertikal Interaktif
+fig_umur = px.bar(
+    umur_data_sorted,
+    x='kelompok_umur', y='prevalensi',
+    color='prevalensi', color_continuous_scale=px.colors.sequential.Blues,
+    text=umur_data_sorted['prevalensi'].round(1).astype(str) + '%'
+)
+fig_umur.update_traces(textposition='auto')
+fig_umur.update_layout(showlegend=False)
 
-with col_vis_1:
-    # A. Bar Plot Jumlah Balita per Kecamatan
-    fig_bar = px.bar(
-        kecamatan_data_sorted, 
-        x='nama_kecamatan', 
-        y='Jumlah Balita',
-        title='1. Distribusi Jumlah Balita per Kecamatan',
-        text='Jumlah Balita',
-        color='Jumlah Balita',
-        color_continuous_scale=px.colors.sequential.Bluyl
-    )
-    # --- ANOTASI ANDA DITAMBAHKAN DI SINI ---
-    fig_bar.add_annotation(
-        x=0.5, y=0.5, xref="paper", yref="paper", 
-        text="DATA STUNTING 2025", 
-        showarrow=False, 
-        font=dict(size=40, color="rgba(0,0,0,0.1)", family="Arial"),
-        xanchor='center', yanchor='middle'
-    )
-    # --- ANOTASI SELESAI ---
-    
-    st.plotly_chart(fig_bar, use_container_width=True)
+# 3.3. Diagnostik Z-Score (Scatter Plot)
+fig_zscore = px.scatter(
+    df, x='zsc_tbu', y='zsc_bbu', 
+    color='stunting_balita',
+    color_discrete_map={'Ya': 'red', 'Tidak': 'green'},
+    hover_data=['umur_balita', 'nama_kecamatan', 'jenis_kelamin_balita']
+)
+fig_zscore.update_layout(showlegend=True)
 
-with col_vis_2:
-    # B. Pie Chart Status Stunting
-    fig_pie = px.pie(
-        stunting_counts, 
-        names='Status', 
-        values='Jumlah',
-        title='2. Persentase Status Stunting Balita',
-        color_discrete_map={'Ya': 'red', 'Tidak': 'green'}
-    )
-    st.plotly_chart(fig_pie, use_container_width=True)
+# 3.4. KPI Card (Prevalensi Total)
+fig_kpi = go.Figure(go.Indicator(
+    mode="number+gauge",
+    value=prevalensi_stunting,
+    title={'text': "<b>Prevalensi Stunting Total (%)</b>"},
+    number={'suffix': "%", 'font': {'size': 48}},
+    gauge={
+        'axis': {'range': [None, 30]},
+        'bar': {'color': "darkred"},
+        'steps': [{'range': [0, 10], 'color': "lightgreen"}, {'range': [10, 20], 'color': "yellow"}, {'range': [20, 30], 'color': "red"}],
+        'threshold': {'line': {'color': "black", 'width': 4}, 'thickness': 0.75, 'value': 20} # Target WHO/Nasional
+    }
+))
 
-# Baris 2: Scatter Plot Z-Score
-st.markdown("---")
-st.subheader("📉 Analisis Detail Z-Score")
 
-# C. Scatter Plot Z-Score (TB/U vs BB/U)
-fig_scatter = go.Figure()
-color_map = {'Pendek': 'red', 'Sangat Pendek': 'darkred', 'Normal': 'green', 'Tinggi': 'blue'}
-df['color'] = df['status_tbu'].map(color_map)
+# --- 4. MERANGKAI SEMUA KOMPONEN MENJADI DASHBOARD AKHIR (SUBPLOT) ---
 
-fig_scatter.add_trace(
-    go.Scatter(
-        x=df['zsc_tbu'], 
-        y=df['zsc_bbu'],
-        mode='markers',
-        name='Balita',
-        marker=dict(
-            size=10, 
-            opacity=0.7, 
-            color=df['color']
-        ),
-        hovertemplate="Nama: %{customdata[0]}<br>TB/U: %{x}<br>BB/U: %{y}<extra></extra>",
-        customdata=df[['nama_balita']]
+fig_dashboard = make_subplots(
+    rows=2, cols=2,
+    specs=[
+        [{"type": "indicator"}, {"type": "xy"}], 
+        [{"type": "xy"}, {"type": "xy"}]     
+    ],
+    subplot_titles=(
+        "1. KPI: Prevalensi Stunting Total",
+        "2. Fase Kritis: Prevalensi Berdasarkan Kelompok Umur",
+        "3. Area Prioritas: Top 10 Kecamatan (Prevalensi Stunting %)",
+        "4. Diagnostik Z-Score (TB/U vs BB/U)"
     )
 )
 
-# Menambahkan garis batas WHO Z-Score
-fig_scatter.add_vline(x=-2, line_width=1, line_dash="dash", line_color="red", annotation_text="Batas Stunting (-2 SD)", annotation_position="top left")
-fig_scatter.add_hline(y=-2, line_width=1, line_dash="dash", line_color="orange", annotation_text="Batas Gizi Kurang (-2 SD)", annotation_position="bottom right")
+# Row 1
+fig_dashboard.add_trace(fig_kpi.data[0], row=1, col=1)
+for trace in fig_umur.data: fig_dashboard.add_trace(trace, row=1, col=2)
+# Row 2
+for trace in fig_kecamatan.data: fig_dashboard.add_trace(trace, row=2, col=1)
+for trace in fig_zscore.data: fig_dashboard.add_trace(trace, row=2, col=2)
 
-
-fig_scatter.update_layout(
-    title='3. Sebaran Z-Score Tinggi Badan menurut Usia (TB/U) vs Berat Badan menurut Usia (BB/U)',
-    xaxis_title='Z-Score TB/U (Stunting/Pendek)',
-    yaxis_title='Z-Score BB/U (Gizi Kurang/Normal)',
-    height=600,
-    hovermode="closest"
+# Menambahkan garis batas Z-Score pada subplot diagnostik (Rata-rata 2, Kolom 2)
+fig_dashboard.add_shape(
+    type="line", x0=-2, y0=-5, x1=-2, y1=5, 
+    line=dict(color="gray", width=1, dash="dash"), row=2, col=2
 )
+fig_dashboard.add_shape(
+    type="line", x0=-5, y0=-2, x1=5, y1=-2, 
+    line=dict(color="gray", width=1, dash="dash"), row=2, col=2
+)
+# Mengatur label sumbu untuk Scatter Plot
+fig_dashboard.update_xaxes(title_text='Z-Score TB/U', row=2, col=2)
+fig_dashboard.update_yaxes(title_text='Z-Score BB/U', row=2, col=2)
 
-st.plotly_chart(fig_scatter, use_container_width=True)
+
+# --- 5. LAYOUT & DISPLAY AKHIR ---
+
+fig_dashboard.update_layout(
+    height=850,
+    title_text="**Dashboard Kecerdasan Bisnis: Analisis Skrining Stunting**",
+    showlegend=True,
+    legend=dict(orientation="h", yanchor="bottom", y=-0.1, xanchor="center", x=0.5),
+)
+# Menambahkan Anotasi (Watermark) ke fig_dashboard
+fig_dashboard.add_annotation(
+    x=0.5, y=0.5, xref="paper", yref="paper", 
+    text="DATA SKRINING STUNTING 2025", 
+    showarrow=False, 
+    font=dict(size=40, color="rgba(0,0,0,0.1)", family="Arial"),
+    xanchor='center', yanchor='middle'
+)
+# 
+
+# INI ADALAH FUNGSI UNTUK MENAMPILKAN PLOTLY DI STREAMLIT
+st.plotly_chart(fig_dashboard, use_container_width=True)
 
 
-# --- 5. DATA TABLE ---
+# --- 6. INSIGHTS STREAMLIT ---
 st.markdown("---")
-st.subheader("Raw Data Table")
-st.dataframe(df)
+st.subheader("💡 Insight Utama & Rekomendasi")
+st.markdown(f"""
+1.  **Area Prioritas:** Fokuskan intervensi ke Kecamatan **{kecamatan_data_sorted.iloc[0]['nama_kecamatan']}** dengan prevalensi stunting tertinggi ({kecamatan_data_sorted.iloc[0]['prevalensi']:.1f}%).
+2.  **Fase Kritis:** Kelompok usia **{umur_data_sorted.iloc[0]['kelompok_umur']}** menunjukkan prevalensi tertinggi, menandakan perlunya intervensi gizi intensif pada fase **12-24 Bulan** pertama kehidupan balita.
+3.  **Diagnostik Z-Score:** Plot menunjukkan sebaran status gizi, membantu mengidentifikasi balita yang menderita **Stunting** (TB/U < -2) atau **Gizi Kurang** (BB/U < -2) secara visual.
+""")
