@@ -7,20 +7,19 @@ import io
 
 # --- Konfigurasi Halaman Streamlit ---
 st.set_page_config(layout="wide", page_title="Dashboard Analisis Stunting")
-st.title("✅ Dashboard Analisis Skrining Stunting (Menggunakan Streamlit Columns)")
-st.sidebar.markdown("Status: **APP IS RUNNING**") # CHECKPOINT 1: Pastikan Streamlit aktif
+st.title("✅ Dashboard Analisis Skrining Stunting")
+st.sidebar.markdown("Status: **APP IS RUNNING**")
 st.markdown("---")
 
 # --- 1. PEMUATAN DATA (FIXED & CACHED) ---
-# [Fungsi load_data() Anda di sini]
 
 @st.cache_data
 def load_data():
     """Memuat dan membersihkan data dari CSV snippet."""
     data_csv_snippet = """
 tgl_pengambilan_data,nik_balita,nama_balita,tgl_lahir_balita,jenis_kelamin_balita,umur_balita,bb_balita_lahir,tb_balita_lahir,bb_balita,tb_balita,zsc_tbu,zsc_bbtb,zsc_bbu,stunting_balita,status_tbu,status_bbtb,status_bbu,nama_responden,nik_responden,no_hp_responden,tgl_lahir_responden,nama_puskesmas,nama_kecamatan,nama_desa,rt,rw
-1/3/2025,s0:1wNMg/i1akEl3uEbwDKvZpk6d0IcoGhYprlQsOW47UX659YuPs9PfSCgOyY=,s0:4ZOaffhqPfJ76xo7CblKY2D4SKPaWyj3kZEaMmo5jDSsl8vj20AIXNg1aIJjmTYx,s0:aoBbahZAiUabN3Li0y09myqA2Y01j1O3eKC3Qx+lkeB0T+QlryI=,Laki - Laki,2 Tahun 5 Bulan,1.4,39,10,84,-2.158,-1.695,-2.324,Ya,Pendek,Gizi Baik,BB Kurang,s0:iLFdMgDCkN31FFEsZb/oKlyPlSfGOyBnJmw1fg...,s0:GMgpcLMH9uog+gcuCRkN2hxl7jZ3nBgvp4SfhSi5gak5tg==,s0:Z0DSH4HK+vD1VokPofbaOPdpj2kmTWG8E+dqfIKJ8ULS3iRZw/g4TXlvzOI=,s0:o9mJpfL7c3A94OGkVXN8nIk4wIBm+DEKrJI/AaFsKdBDTC9r5rP/PA==,s0:XEU9oIW2D5WaIc3JmfJq7fVV8lcodGNmP8xbqV0RjkI+hW8gSBU=,Puskesmas Porong,Porong,Pamotan,05,02
-11/18/2025,s0:pOqNnzi7gIsbELF5fwZaTdm3JQZ2P4j+UEZu0tp2om152mUFWQZjnIGRDMw=,s0:KNKG6i1DmDfWxeNlMWkhemhM6ySJEV37fvRToEVObvnNgfjXhA==,s0:/RGgJmWbTO0RERKsOjtZzmfT1U5wFVr...,Laki - Laki,1 Tahun 0 Bulan,3.3,50,7.9,74.5,-0.894,-2.184,-1.997,Tidak,Normal,Gizi Kurang,BB Normal,s0:GMgpcLMH9uog+gcuCRkN2hxl7jZ3nBgvp4SfhSi5gak5tg==,s0:Z0DSH4HK+vD1VokPofbaOPdpj2kmTWG8E+dqfIKJ8ULS3iRZw/g4TXlvzOI=,s0:o9mJpfL7c3A94OGkVXN8nIk4wIBm+DEKrJI/AaFsKdBDTC9r5rP/PA==,s0:XEU9oIW2D5WaIc3JmfJq7fVV8lcodGNmP8xbqV0RjkI+hW8gSBU=,Puskesmas Porong,Porong,Pamotan,05,02
+1/3/2025,s0:1wNMg/i1akEl3uEbwDKvZpk6d0IcoGhYprlQsOW47UX659YuPs9PfSCgOyY=,s0:4ZOaffhqPfJ76xo7CblKY2D4SKPaWyj3kZEaMmo5jDSsl8vj20AIXNg1aIJjmTYx,s0:aoBbahZAiUabN3Li0y09myqA2Y01j1O3eKC3Qx+lkeB0T+QlryI=,Laki - Laki,2 Tahun 5 Bulan,1.4,39,10,84,-2.158,-1.695,-2.324,Ya,Pendek,Gizi Baik,BB Kurang,s0:iLFdMgDCkN31FFEsZb/oKlyPlSfGOyBnJmw1fg...,s0:GMgpcLMH9uog+gcuCRkN2hxl7jZ3nBgvp4SfhSi5gak5tg==,s0:Z0DSH4HK+vD1VokPofbaOPdpj2kmTWG8E+dqfIKJ8ULS3iRZw/g4TXlvzOI=,s0:o9mJpfL7c3A94OGkVXN8nIk4wIBm+DEKrJI/AaFsKdBDTC9r5rP/PA==,s0:XEU9oIW2D5WaIc3JmfJq7fVV6lcodGNmP8xbqV0RjkI+hW8gSBU=,Puskesmas Porong,Porong,Pamotan,05,02
+11/18/2025,s0:pOqNnzi7gIsbELF5fwZaTdm3JQZ2P4j+UEZu0tp2om152mUFWQZjnIGRDMw=,s0:KNKG6i1DmDfWxeNlMWkhemhM6ySJEV37fvRToEVObvnNgfjXhA==,s0:/RGgJmWbTO0RERKsOjtZzmfT1U5wFVr...,Laki - Laki,1 Tahun 0 Bulan,3.3,50,7.9,74.5,-0.894,-2.184,-1.997,Tidak,Normal,Gizi Kurang,BB Normal,s0:GMgpcLMH9uog+gcuCRkN2hxl7jZ3nBgvp4SfhSi5gak5tg==,s0:Z0DSH4HK+vD1VokPofbaOPdpj2kmTWG8E+dqfIKJ8ULS3iRZw/g4TXlvzOI=,s0:o9mJpfL7c3A94OGkVXN8nIk4wIBm+DEKrJI/AaFsKdBDTC9r5rP/PA==,s0:XEU9oIW2D5WaIc3JmfJq7fVV6lcodGNmP8xbqV0RjkI+hW8gSBU=,Puskesmas Porong,Porong,Pamotan,05,02
 """
     df = pd.read_csv(io.StringIO(data_csv_snippet))
     df.columns = [col.lower().replace(' ', '_').replace('.', '') for col in df.columns]
@@ -53,9 +52,11 @@ tgl_pengambilan_data,nik_balita,nama_balita,tgl_lahir_balita,jenis_kelamin_balit
 
 try:
     df = load_data()
+    print("CHECKPOINT LOG 2: Data berhasil dimuat dan dibersihkan.") 
 except Exception as e:
     st.error(f"❌ Error saat memuat atau membersihkan data: {e}")
     st.stop()
+    print(f"ERROR LOG: Data gagal dimuat: {e}") 
 
 if df.empty or len(df) < 2:
     st.error("⚠️ Data tidak cukup setelah cleaning untuk membuat dashboard.")
@@ -65,7 +66,7 @@ if df.empty or len(df) < 2:
 total_balita = len(df)
 prevalensi_stunting = (df['is_stunting'].sum() / total_balita) * 100 if total_balita > 0 else 0
 
-st.markdown(f"**CHECKPOINT 2:** Total Balita Ditemukan: **{total_balita}**") # CHECKPOINT 2: Pastikan data dimuat
+st.markdown(f"**CHECKPOINT 3:** Total Balita Ditemukan: **{total_balita}**")
 
 # Segmentasi Kecamatan
 kecamatan_data = df.groupby('nama_kecamatan')['is_stunting'].agg(total_kasus='sum', total_populasi='count').reset_index()
@@ -82,6 +83,7 @@ kecamatan_fokus = kecamatan_data_sorted.iloc[0]['nama_kecamatan'] if not kecamat
 prevalensi_fokus = kecamatan_data_sorted.iloc[0]['prevalensi'] if not kecamatan_data_sorted.empty else 0
 umur_fokus = umur_data_sorted.iloc[0]['kelompok_umur'] if not umur_data_sorted.empty else "Tidak Diketahui"
 
+print("CHECKPOINT LOG 4: Perhitungan agregasi selesai. Memulai pembuatan Plotly figures.")
 
 # --- 3. VISUALISASI PLOTLY (KOMPONEN) ---
 
@@ -89,8 +91,8 @@ umur_fokus = umur_data_sorted.iloc[0]['kelompok_umur'] if not umur_data_sorted.e
 fig_kpi = go.Figure(go.Indicator(
     mode="number+gauge",
     value=prevalensi_stunting,
-    title={'text': "<b>1. KPI: Prevalensi Stunting Total (%)</b>"}, # Judul dimasukkan ke KPI
-    number={'suffix': "%", 'font': {'size': 48}},
+    title={'text': "<b>1. KPI: Prevalensi Stunting Total (%)</b>"},
+    number={'suffix': "%", 'font": {'size': 48}},
     gauge={
         'axis': {'range': [None, 30]},
         'bar': {'color': "darkred"},
@@ -142,6 +144,8 @@ fig_zscore.update_layout(
 )
 
 st.markdown("---")
+print("CHECKPOINT LOG 5: Figure selesai dibuat. Memulai penempatan Streamlit.") 
+
 # --- 4. LAYOUT STREAMLIT NATIVE ---
 
 # Row 1: KPI and Umur
@@ -159,7 +163,6 @@ with col3:
     st.plotly_chart(fig_kecamatan, use_container_width=True)
 with col4:
     st.plotly_chart(fig_zscore, use_container_width=True)
-    
 
 
 # --- 5. INSIGHTS STREAMLIT ---
@@ -171,3 +174,5 @@ st.markdown(f"""
 """)
 st.subheader("Raw Data Sample")
 st.dataframe(df.head())
+
+print("CHECKPOINT LOG 6: Skrip selesai dieksekusi.")
