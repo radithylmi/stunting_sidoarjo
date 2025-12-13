@@ -1,13 +1,8 @@
 import pandas as pd
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
 import plotly.express as px
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-
-# Atur style visualisasi
-sns.set_style("whitegrid")
 
 # --- 1. PEMUATAN DATA ---
 # Menggunakan path yang Anda tentukan
@@ -239,3 +234,4 @@ print("\n--- Insight Utama Dashboard ---")
 print(f"1. **Wilayah Prioritas:** Fokuskan intervensi ke Kecamatan **{kecamatan_data_sorted.iloc[0]['nama_kecamatan']}** (terlihat jelas pada grafik Area Prioritas).")
 print(f"2. **Fase Kritis:** Kelompok usia **{umur_data_sorted.iloc[0]['kelompok_umur']}** menunjukkan risiko tertinggi, menuntut intervensi gizi intensif pada fase tersebut.")
 print("3. **Diagnostik Z-Score:** Plot menunjukkan sebaran status gizi, membantu mengidentifikasi balita yang menderita Stunting (TB/U < -2) atau Gizi Kurang (BB/U < -2) secara visual.")
+
