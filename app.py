@@ -628,7 +628,7 @@ with tab4:
             )
             fig_pie.update_layout(height=400)
             
-                            st.plotly_chart(fig_pie, width='stretch', key="pie_chart_tab4")
+            st.plotly_chart(fig_pie, width='stretch', key="pie_chart_tab4")
         
         with col_bar_status:
             status_df = pd.DataFrame({
@@ -928,7 +928,7 @@ with stat_col4:
     )
 
 # ===============================
-# DEBUG
+# DEBUG & INFORMASI DATASET
 # ===============================
 with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
     st.markdown("### 📊 Ringkasan Dataset")
@@ -1048,10 +1048,10 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
         if len(available_cols) > 0:
             preview_data = df_filtered[available_cols].head(10).copy()
             
-            # Format data untuk tampilan lebih baik dengan error handling yang kuat
+            # Format data untuk tampilan lebih baik dengan validasi ketat
             if 'umur_balita' in preview_data.columns:
                 preview_data['umur_balita'] = preview_data['umur_balita'].apply(
-                    lambda x: f"{float(x):.0f} bulan" if pd.notna(x) and str(x).replace('.','').isdigit() else (str(x) if pd.notna(x) else "N/A")
+                    lambda x: f"{float(x):.0f} bulan" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
                 )
             
             if 'bb_balita' in preview_data.columns:
