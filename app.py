@@ -92,49 +92,74 @@ kec_df["prevalensi"] = (
 )
 
 # ===============================
-# MAP MENGGUNAKAN CHOROPLETH_MAPBOX (LEBIH BAGUS!)
+# MAP MENGGUNAKAN CHOROPLETH_MAPBOX (LEBIH BERWARNA!)
 # ===============================
 st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
 
-# Buat peta dengan mapbox (lebih bagus dari choropleth biasa)
-fig_map = px.choropleth_mapbox(
-    kec_df,
-    geojson=geojson,
-    locations="nama_kecamatan",
-    featureidkey="properties.NAMOBJ",
-    color="prevalensi",
-    color_continuous_scale="Reds",
-    range_color=(0, kec_df["prevalensi"].max() if len(kec_df) > 0 else 100),
-    mapbox_style="carto-positron",
-    center={"lat": -7.45, "lon": 112.71},  # Koordinat Sidoarjo
-    zoom=10,
-    opacity=0.7,
-    hover_name="nama_kecamatan",
-    hover_data={
-        "nama_kecamatan": False,
-        "total_balita": ":,",
-        "total_kasus": ":,",
-        "prevalensi": ":.2f"
-    },
-    labels={
-        "prevalensi": "Prevalensi (%)",
-        "total_balita": "Total Balita",
-        "total_kasus": "Kasus Stunting"
-    }
-)
+# Pilihan color scale
+col_map1, col_map2 = st.columns([3, 1])
 
-fig_map.update_layout(
-    margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    height=600,
-    coloraxis_colorbar={
-        "title": "Prevalensi<br>Stunting (%)",
-        "thickness": 15,
-        "len": 0.7,
-        "x": 1.02
-    }
-)
+with col_map2:
+    color_scheme = st.selectbox(
+        "🎨 Pilih Skema Warna:",
+        ["RdYlGn_r", "Turbo", "Jet", "Hot", "Rainbow", "Portland", "Picnic", "Reds"],
+        index=0
+    )
+
+with col_map1:
+    # Buat peta dengan mapbox (lebih bagus dari choropleth biasa)
+    fig_map = px.choropleth_mapbox(
+        kec_df,
+        geojson=geojson,
+        locations="nama_kecamatan",
+        featureidkey="properties.NAMOBJ",
+        color="prevalensi",
+        color_continuous_scale=color_scheme,
+        range_color=(0, 100),  # Fixed range 0-100%
+        mapbox_style="carto-positron",
+        center={"lat": -7.45, "lon": 112.71},  # Koordinat Sidoarjo
+        zoom=10,
+        opacity=0.85,
+        hover_name="nama_kecamatan",
+        hover_data={
+            "nama_kecamatan": False,
+            "total_balita": ":,",
+            "total_kasus": ":,",
+            "prevalensi": ":.2f"
+        },
+        labels={
+            "prevalensi": "Prevalensi (%)",
+            "total_balita": "Total Balita",
+            "total_kasus": "Kasus Stunting"
+        }
+    )
+
+    fig_map.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        height=600,
+        coloraxis_colorbar={
+            "title": "Prevalensi<br>Stunting (%)",
+            "thickness": 20,
+            "len": 0.7,
+            "x": 1.02,
+            "tickvals": [0, 20, 40, 60, 80, 100],
+            "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
+        }
+    )
 
 st.plotly_chart(fig_map, use_container_width=True)
+
+# Keterangan warna
+st.markdown("""
+<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
+    <strong>📌 Keterangan:</strong><br>
+    • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Prevalensi Sangat Tinggi (≥80%)<br>
+    • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Prevalensi Tinggi (60-79%)<br>
+    • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Prevalensi Sedang (40-59%)<br>
+    • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Prevalensi Rendah (20-39%)<br>
+    • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Prevalensi Sangat Rendah (<20%)
+</div>
+""", unsafe_allow_html=True)
 
 # ===============================
 # LAYOUT 2 KOLOM: BAR CHART & TOP 5
@@ -250,81 +275,93 @@ with stat_col4:
     )
 
 # ===============================
-# TABEL DATA DENGAN GRADIENT (TANPA MATPLOTLIB)
+# TABEL DATA LENGKAP
 # ===============================
 with st.expander("📋 Lihat Data Lengkap per Kecamatan"):
     kec_sorted = kec_df.sort_values("prevalensi", ascending=False).reset_index(drop=True)
     
-    # Buat HTML table dengan gradient
-    max_prev = kec_sorted["prevalensi"].max()
-    min_prev = kec_sorted["prevalensi"].min()
+    # Tambahkan kolom ranking
+    kec_sorted.insert(0, "Rank", range(1, len(kec_sorted) + 1))
     
-    html_table = """
-    <style>
-        .custom-table {
-            width: 100%;
-            border-collapse: collapse;
-            font-family: 'Source Sans Pro', sans-serif;
-        }
-        .custom-table th {
-            background-color: #f0f2f6;
-            padding: 12px;
-            text-align: left;
-            font-weight: 600;
-            border-bottom: 2px solid #ddd;
-        }
-        .custom-table td {
-            padding: 10px 12px;
-            border-bottom: 1px solid #eee;
-        }
-        .custom-table tr:hover {
-            background-color: #f9fafb;
-        }
-    </style>
-    <table class="custom-table">
-        <thead>
-            <tr>
-                <th style="width: 5%;">Rank</th>
-                <th style="width: 35%;">Kecamatan</th>
-                <th style="width: 20%;">Total Balita</th>
-                <th style="width: 20%;">Kasus Stunting</th>
-                <th style="width: 20%;">Prevalensi</th>
-            </tr>
-        </thead>
-        <tbody>
-    """
+    # Format kolom untuk tampilan
+    kec_display = kec_sorted.copy()
+    kec_display["Rank"] = kec_display["Rank"].apply(lambda x: f"#{x}")
+    kec_display["prevalensi_display"] = kec_display["prevalensi"].apply(lambda x: f"{x:.2f}%")
     
+    # Buat dataframe untuk ditampilkan
+    display_df = pd.DataFrame({
+        "Rank": kec_display["Rank"],
+        "Kecamatan": kec_display["nama_kecamatan"],
+        "Total Balita": kec_display["total_balita"],
+        "Kasus Stunting": kec_display["total_kasus"],
+        "Prevalensi": kec_display["prevalensi_display"]
+    })
+    
+    # Tampilkan dengan st.dataframe (lebih reliable)
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        column_config={
+            "Rank": st.column_config.TextColumn(
+                "Rank",
+                width="small"
+            ),
+            "Kecamatan": st.column_config.TextColumn(
+                "Kecamatan",
+                width="medium"
+            ),
+            "Total Balita": st.column_config.NumberColumn(
+                "Total Balita",
+                format="%d"
+            ),
+            "Kasus Stunting": st.column_config.NumberColumn(
+                "Kasus Stunting",
+                format="%d"
+            ),
+            "Prevalensi": st.column_config.TextColumn(
+                "Prevalensi",
+                width="small"
+            )
+        }
+    )
+    
+    # Tambahkan visualisasi mini untuk setiap kecamatan
+    st.markdown("---")
+    st.markdown("**📊 Detail per Kecamatan:**")
+    
+    cols = st.columns(3)
     for idx, row in kec_sorted.iterrows():
-        # Hitung intensitas warna berdasarkan prevalensi
-        if max_prev > min_prev:
-            intensity = (row["prevalensi"] - min_prev) / (max_prev - min_prev)
-        else:
-            intensity = 0.5
-        
-        # Warna gradient dari putih ke merah
-        red = 255
-        green = int(255 * (1 - intensity * 0.8))
-        blue = int(255 * (1 - intensity * 0.8))
-        bg_color = f"rgb({red}, {green}, {blue})"
-        
-        html_table += f"""
-        <tr>
-            <td style="text-align: center; font-weight: 600;">#{idx + 1}</td>
-            <td><strong>{row['nama_kecamatan']}</strong></td>
-            <td style="text-align: right;">{row['total_balita']:,}</td>
-            <td style="text-align: right;">{row['total_kasus']:,}</td>
-            <td style="text-align: right; background-color: {bg_color}; font-weight: 600;">
-                {row['prevalensi']:.2f}%
-            </td>
-        </tr>
-        """
-    
-    html_table += """
-        </tbody>
-    </table>
-    """
-    
-    st.markdown(html_table, unsafe_allow_html=True)
+        with cols[idx % 3]:
+            # Tentukan warna berdasarkan prevalensi
+            if row["prevalensi"] >= 80:
+                color = "🔴"
+            elif row["prevalensi"] >= 60:
+                color = "🟠"
+            elif row["prevalensi"] >= 40:
+                color = "🟡"
+            else:
+                color = "🟢"
+            
+            st.markdown(f"""
+            <div style="
+                background-color: #f8f9fa;
+                padding: 10px;
+                border-radius: 8px;
+                margin-bottom: 10px;
+                border-left: 3px solid #dee2e6;
+            ">
+                <div style="font-size: 12px; color: #666;">
+                    {color} <strong>{row['nama_kecamatan']}</strong>
+                </div>
+                <div style="font-size: 20px; font-weight: bold; color: #dc3545; margin: 5px 0;">
+                    {row['prevalensi']:.2f}%
+                </div>
+                <div style="font-size: 11px; color: #888;">
+                    {row['total_kasus']:,} / {row['total_balita']:,} balita
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
 
 # ===============================
 # DEBUG
