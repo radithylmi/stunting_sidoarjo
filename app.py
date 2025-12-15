@@ -32,7 +32,7 @@ def load_data():
 
 @st.cache_data
 def load_geojson():
-    with open("kecamatan_sidoarjo (1).geojson", "r", encoding="utf-8") as f:
+    with open("kecamatan_sidoarjo.geojson", "r", encoding="utf-8") as f:
         geojson = json.load(f)
     return geojson
 
@@ -145,3 +145,4 @@ fig_umur = px.bar(
 )
 
 # ---------------------------------------------------
+
