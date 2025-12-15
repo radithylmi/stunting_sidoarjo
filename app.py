@@ -1,12 +1,11 @@
 # =====================================================
-# STREAMLIT DASHBOARD & PETA INTERAKTIF STUNTING
-# KABUPATEN SIDOARJO
+# STREAMLIT DASHBOARD STUNTING SIDOARJO
+# TANPA GEOPANDAS
 # =====================================================
 
 import streamlit as st
 import pandas as pd
 import numpy as np
-import geopandas as gpd
 import json
 import plotly.express as px
 
@@ -19,8 +18,7 @@ st.set_page_config(
     page_icon="📊"
 )
 
-st.title("📊 Dashboard Kecerdasan Bisnis & Peta Interaktif Stunting")
-st.markdown("**Kabupaten Sidoarjo**")
+st.title("📊 Dashboard Stunting Kabupaten Sidoarjo")
 
 # -----------------------------------------------------
 # LOAD DATA
@@ -28,20 +26,18 @@ st.markdown("**Kabupaten Sidoarjo**")
 @st.cache_data
 def load_data():
     df = pd.read_csv("data_skrinning_stunting(1).csv")
-    df.columns = df.columns.str.lower().str.replace(" ", "_").str.replace(".", "")
+    df.columns = df.columns.str.lower().str.replace(" ", "_")
+    df["nama_kecamatan"] = df["nama_kecamatan"].str.upper()
     return df
 
 @st.cache_data
 def load_geojson():
-    gdf = gpd.read_file("kecamatan_sidoarjo (1).geojson")
-    gdf.columns = gdf.columns.str.lower().str.replace(" ", "_")
-    if "namobj" in gdf.columns:
-        gdf = gdf.rename(columns={"namobj": "nama_kecamatan"})
-    gdf["nama_kecamatan"] = gdf["nama_kecamatan"].str.upper()
-    return gdf
+    with open("kecamatan_sidoarjo (1).geojson", "r", encoding="utf-8") as f:
+        geojson = json.load(f)
+    return geojson
 
 df = load_data()
-gdf = load_geojson()
+geojson = load_geojson()
 
 # -----------------------------------------------------
 # FEATURE ENGINEERING
@@ -61,141 +57,91 @@ def kategori_umur(umur):
                 bulan = int(p)
     total = tahun * 12 + bulan
     if total <= 12:
-        return "A. 0–12 Bulan"
+        return "0–12 Bulan"
     elif total <= 24:
-        return "B. 13–24 Bulan (Kritis)"
+        return "13–24 Bulan"
     elif total <= 36:
-        return "C. 25–36 Bulan"
-    elif total <= 60:
-        return "D. 37–60 Bulan"
+        return "25–36 Bulan"
     else:
-        return "E. > 60 Bulan"
+        return "37–60 Bulan"
 
 df["kelompok_umur"] = df["umur_balita"].apply(kategori_umur)
-df.dropna(subset=["nama_kecamatan", "stunting_balita"], inplace=True)
-df["nama_kecamatan"] = df["nama_kecamatan"].str.upper()
 
 # -----------------------------------------------------
-# FILTER SIDEBAR
+# SIDEBAR FILTER
 # -----------------------------------------------------
 st.sidebar.header("🔎 Filter Data")
 
-# Filter Kecamatan
-kec_list = ["Semua"] + sorted(df["nama_kecamatan"].unique())
-kec_filter = st.sidebar.selectbox("Pilih Kecamatan", kec_list)
+kec_filter = st.sidebar.selectbox(
+    "Pilih Kecamatan",
+    ["Semua"] + sorted(df["nama_kecamatan"].unique())
+)
+
+umur_filter = st.sidebar.multiselect(
+    "Pilih Kelompok Umur",
+    sorted(df["kelompok_umur"].unique()),
+    default=sorted(df["kelompok_umur"].unique())
+)
 
 if kec_filter != "Semua":
     df = df[df["nama_kecamatan"] == kec_filter]
 
-# ===== FILTER UMUR (BARU) =====
-umur_list = sorted(df["kelompok_umur"].unique())
-umur_filter = st.sidebar.multiselect(
-    "Pilih Kelompok Umur",
-    options=umur_list,
-    default=umur_list
-)
-
 df = df[df["kelompok_umur"].isin(umur_filter)]
-
-# -----------------------------------------------------
-# INFO FILTER AKTIF
-# -----------------------------------------------------
-st.info(
-    f"📌 Filter aktif → Kecamatan: **{kec_filter}**, "
-    f"Kelompok Umur: **{', '.join(umur_filter)}**"
-)
 
 # -----------------------------------------------------
 # KPI
 # -----------------------------------------------------
 total = len(df)
 kasus = df["is_stunting"].sum()
-prev = (kasus / total) * 100 if total > 0 else 0
+prev = (kasus / total * 100) if total else 0
 
-col1, col2, col3 = st.columns(3)
-col1.metric("Total Balita", total)
-col2.metric("Kasus Stunting", kasus)
-col3.metric("Prevalensi", f"{prev:.2f}%")
-
-# -----------------------------------------------------
-# AGREGASI DATA
-# -----------------------------------------------------
-kec_df = df.groupby("nama_kecamatan")["is_stunting"].agg(
-    total_kasus="sum",
-    total_populasi="count"
-).reset_index()
-
-kec_df["prevalensi"] = kec_df["total_kasus"] / kec_df["total_populasi"] * 100
-
-umur_df = df.groupby("kelompok_umur")["is_stunting"].agg(
-    total_kasus="sum",
-    total_populasi="count"
-).reset_index()
-
-umur_df["prevalensi"] = umur_df["total_kasus"] / umur_df["total_populasi"] * 100
-umur_df = umur_df.sort_values("kelompok_umur")
+c1, c2, c3 = st.columns(3)
+c1.metric("Total Balita", total)
+c2.metric("Kasus Stunting", kasus)
+c3.metric("Prevalensi", f"{prev:.2f}%")
 
 # -----------------------------------------------------
-# MERGE DENGAN PETA
+# AGREGASI KECAMATAN
 # -----------------------------------------------------
-gdf_merge = gdf.merge(kec_df, on="nama_kecamatan", how="left")
-gdf_merge[["prevalensi","total_kasus","total_populasi"]] = (
-    gdf_merge[["prevalensi","total_kasus","total_populasi"]].fillna(0)
+kec_df = (
+    df.groupby("nama_kecamatan")["is_stunting"]
+    .agg(total_kasus="sum", total_balita="count")
+    .reset_index()
 )
-
-geojson = json.loads(gdf_merge.to_json())
+kec_df["prevalensi"] = kec_df["total_kasus"] / kec_df["total_balita"] * 100
 
 # -----------------------------------------------------
-# VISUALISASI
+# CHOROPLETH MAP (TANPA GEOPANDAS)
 # -----------------------------------------------------
 fig_map = px.choropleth(
-    gdf_merge,
+    kec_df,
     geojson=geojson,
-    locations=gdf_merge.index,
+    locations="nama_kecamatan",
+    featureidkey="properties.NAMOBJ",
     color="prevalensi",
-    hover_name="nama_kecamatan",
-    hover_data={"total_kasus": True, "total_populasi": True},
     color_continuous_scale="Reds",
+    hover_data=["total_kasus", "total_balita"],
     title="🗺️ Peta Prevalensi Stunting per Kecamatan"
 )
+
 fig_map.update_geos(fitbounds="locations", visible=False)
+
+# -----------------------------------------------------
+# BAR UMUR
+# -----------------------------------------------------
+umur_df = (
+    df.groupby("kelompok_umur")["is_stunting"]
+    .mean()
+    .reset_index()
+)
+umur_df["prevalensi"] = umur_df["is_stunting"] * 100
 
 fig_umur = px.bar(
     umur_df,
     x="kelompok_umur",
     y="prevalensi",
-    text=umur_df["prevalensi"].round(1),
-    color="prevalensi",
-    color_continuous_scale="Blues",
-    title="📊 Prevalensi Stunting Berdasarkan Kelompok Umur"
+    title="📊 Prevalensi Stunting Berdasarkan Umur",
+    text=umur_df["prevalensi"].round(1)
 )
 
-fig_z = px.scatter(
-    df,
-    x="zsc_tbu",
-    y="zsc_bbu",
-    color="stunting_balita",
-    hover_data=["nama_kecamatan","umur_balita"],
-    title="📈 Diagnostik Z-Score WHO"
-)
-
-# -----------------------------------------------------
-# DISPLAY DASHBOARD
-# -----------------------------------------------------
-st.plotly_chart(fig_map, use_container_width=True)
-
-col_a, col_b = st.columns(2)
-with col_a:
-    st.plotly_chart(fig_umur, use_container_width=True)
-with col_b:
-    st.plotly_chart(fig_z, use_container_width=True)
-
-st.markdown("---")
-st.markdown("### 📌 Insight Singkat")
-st.write(
-    f"""
-    • Prevalensi stunting saat ini **{prev:.2f}%**  
-    • Fokus intervensi pada kecamatan berisiko tinggi  
-    • Usia **13–24 bulan** merupakan fase paling kritis  
-    """
-)
+# ---------------------------------------------------
