@@ -53,14 +53,31 @@ geojson = load_geojson()
 # ===============================
 st.sidebar.header("🔎 Filter Data")
 
+# FILTER KECAMATAN
+kecamatan_opsi = sorted(df["nama_kecamatan"].unique())
+kecamatan_pilih = st.sidebar.multiselect(
+    "📍 Pilih Kecamatan",
+    kecamatan_opsi,
+    default=kecamatan_opsi
+)
+
 # FILTER UMUR
 umur_opsi = sorted(df["umur_balita"].dropna().unique())
 umur_pilih = st.sidebar.multiselect(
-    "Pilih Umur Balita",
+    "👶 Pilih Umur Balita",
     umur_opsi,
     default=umur_opsi
 )
-df_filtered = df[df["umur_balita"].isin(umur_pilih)]
+
+# Terapkan filter
+df_filtered = df[
+    (df["nama_kecamatan"].isin(kecamatan_pilih)) &
+    (df["umur_balita"].isin(umur_pilih))
+]
+
+# Info jumlah data terfilter
+st.sidebar.markdown("---")
+st.sidebar.info(f"📊 **{len(df_filtered):,}** data balita terfilter dari **{len(df):,}** total data")
 
 # ===============================
 # KPI
@@ -92,72 +109,113 @@ kec_df["prevalensi"] = (
 )
 
 # ===============================
-# MAP MENGGUNAKAN CHOROPLETH_MAPBOX (LEBIH BERWARNA!)
+# MAP DENGAN STYLE SEPERTI GOOGLE MAPS
 # ===============================
 st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
 
-# Pilihan color scale
-col_map1, col_map2 = st.columns([3, 1])
+# Kontrol peta di atas
+col_style, col_color, col_zoom = st.columns([2, 2, 1])
 
-with col_map2:
+with col_style:
+    map_style = st.selectbox(
+        "🗺️ Style Peta:",
+        [
+            "Default (Light)", 
+            "Default (Dark)",
+            "Satelit",
+            "Street Map",
+            "Outdoor",
+            "Minimalis"
+        ],
+        index=0
+    )
+    
+    # Mapping ke mapbox style
+    style_mapping = {
+        "Default (Light)": "carto-positron",
+        "Default (Dark)": "carto-darkmatter",
+        "Satelit": "satellite-streets",
+        "Street Map": "open-street-map",
+        "Outdoor": "outdoors",
+        "Minimalis": "basic"
+    }
+    mapbox_style = style_mapping[map_style]
+
+with col_color:
     color_scheme = st.selectbox(
-        "🎨 Pilih Skema Warna:",
+        "🎨 Skema Warna:",
         ["RdYlGn_r", "Turbo", "Jet", "Hot", "Rainbow", "Portland", "Picnic", "Reds"],
         index=0
     )
 
-with col_map1:
-    # Buat peta dengan mapbox (lebih bagus dari choropleth biasa)
-    fig_map = px.choropleth_mapbox(
-        kec_df,
-        geojson=geojson,
-        locations="nama_kecamatan",
-        featureidkey="properties.NAMOBJ",
-        color="prevalensi",
-        color_continuous_scale=color_scheme,
-        range_color=(0, 100),  # Fixed range 0-100%
-        mapbox_style="carto-positron",
-        center={"lat": -7.45, "lon": 112.71},  # Koordinat Sidoarjo
-        zoom=10,
-        opacity=0.85,
-        hover_name="nama_kecamatan",
-        hover_data={
-            "nama_kecamatan": False,
-            "total_balita": ":,",
-            "total_kasus": ":,",
-            "prevalensi": ":.2f"
-        },
-        labels={
-            "prevalensi": "Prevalensi (%)",
-            "total_balita": "Total Balita",
-            "total_kasus": "Kasus Stunting"
-        }
+with col_zoom:
+    zoom_level = st.slider(
+        "🔍 Zoom:",
+        min_value=8,
+        max_value=13,
+        value=10,
+        step=1
     )
 
-    fig_map.update_layout(
-        margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        height=600,
-        coloraxis_colorbar={
-            "title": "Prevalensi<br>Stunting (%)",
-            "thickness": 20,
-            "len": 0.7,
-            "x": 1.02,
-            "tickvals": [0, 20, 40, 60, 80, 100],
-            "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
-        }
-    )
+# Buat peta dengan style yang dipilih
+fig_map = px.choropleth_mapbox(
+    kec_df,
+    geojson=geojson,
+    locations="nama_kecamatan",
+    featureidkey="properties.NAMOBJ",
+    color="prevalensi",
+    color_continuous_scale=color_scheme,
+    range_color=(0, 100),
+    mapbox_style=mapbox_style,
+    center={"lat": -7.45, "lon": 112.71},
+    zoom=zoom_level,
+    opacity=0.85,
+    hover_name="nama_kecamatan",
+    hover_data={
+        "nama_kecamatan": False,
+        "total_balita": ":,",
+        "total_kasus": ":,",
+        "prevalensi": ":.2f"
+    },
+    labels={
+        "prevalensi": "Prevalensi (%)",
+        "total_balita": "Total Balita",
+        "total_kasus": "Kasus Stunting"
+    }
+)
+
+fig_map.update_layout(
+    margin={"r": 0, "t": 0, "l": 0, "b": 0},
+    height=600,
+    coloraxis_colorbar={
+        "title": "Prevalensi<br>Stunting (%)",
+        "thickness": 20,
+        "len": 0.7,
+        "x": 1.02,
+        "tickvals": [0, 20, 40, 60, 80, 100],
+        "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
+    }
+)
 
 st.plotly_chart(fig_map, use_container_width=True)
+
+# Info style peta
+if map_style == "Satelit":
+    st.info("🛰️ **Mode Satelit**: Menampilkan citra satelit dengan label jalan dan kota")
+elif map_style == "Default (Dark)":
+    st.info("🌙 **Mode Gelap**: Cocok untuk presentasi atau tampilan malam")
+elif map_style == "Outdoor":
+    st.info("🏞️ **Mode Outdoor**: Menampilkan topografi dan kontur")
 
 # Keterangan warna
 st.markdown("""
 <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
-    <strong>📌 Keterangan:</strong><br>
-    • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Prevalensi Sangat Tinggi (≥80%)<br>
-    • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Prevalensi Tinggi (60-79%)<br>
-    • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Prevalensi Sedang (40-59%)<br>
-    • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Prevalensi Rendah (20-39%)<br>
-    • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Prevalensi Sangat Rendah (<20%)
+    <strong>📌 Keterangan Prevalensi:</strong><br>
+    • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Sangat Tinggi (≥80%)<br>
+    • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Tinggi (60-79%)<br>
+    • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Sedang (40-59%)<br>
+    • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Rendah (20-39%)<br>
+    • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Sangat Rendah (<20%)
 </div>
 """, unsafe_allow_html=True)
 
