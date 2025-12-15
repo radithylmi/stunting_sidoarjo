@@ -122,22 +122,24 @@ with col_style:
         [
             "Default (Light)", 
             "Default (Dark)",
-            "Satelit",
             "Street Map",
-            "Outdoor",
-            "Minimalis"
+            "Outdoor/Topografi",
+            "Minimalis",
+            "Stamen Terrain",
+            "Stamen Toner"
         ],
         index=0
     )
     
-    # Mapping ke mapbox style
+    # Mapping ke mapbox style (semua gratis, tanpa perlu token)
     style_mapping = {
         "Default (Light)": "carto-positron",
         "Default (Dark)": "carto-darkmatter",
-        "Satelit": "satellite-streets",
         "Street Map": "open-street-map",
-        "Outdoor": "outdoors",
-        "Minimalis": "basic"
+        "Outdoor/Topografi": "stamen-terrain",
+        "Minimalis": "basic",
+        "Stamen Terrain": "stamen-terrain",
+        "Stamen Toner": "stamen-toner"
     }
     mapbox_style = style_mapping[map_style]
 
@@ -200,12 +202,12 @@ fig_map.update_layout(
 st.plotly_chart(fig_map, use_container_width=True)
 
 # Info style peta
-if map_style == "Satelit":
-    st.info("🛰️ **Mode Satelit**: Menampilkan citra satelit dengan label jalan dan kota")
-elif map_style == "Default (Dark)":
+if map_style == "Default (Dark)":
     st.info("🌙 **Mode Gelap**: Cocok untuk presentasi atau tampilan malam")
-elif map_style == "Outdoor":
-    st.info("🏞️ **Mode Outdoor**: Menampilkan topografi dan kontur")
+elif map_style in ["Outdoor/Topografi", "Stamen Terrain"]:
+    st.info("🏞️ **Mode Topografi**: Menampilkan kontur dan ketinggian medan")
+elif map_style == "Stamen Toner":
+    st.info("🖋️ **Mode Toner**: Tampilan hitam-putih dengan detail tinggi")
 
 # Keterangan warna
 st.markdown("""
