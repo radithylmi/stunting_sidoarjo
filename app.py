@@ -928,11 +928,167 @@ with stat_col4:
 # ===============================
 # DEBUG
 # ===============================
-with st.expander("🧪 Debug Data"):
-    st.write("**Jumlah baris data:**", len(df_filtered))
-    st.write("**Jumlah kecamatan:**", len(kec_df))
-    st.write("**Kolom tersedia:**", df.columns.tolist())
-    st.write("**Preview data agregasi kecamatan:**")
-    st.dataframe(kec_df.head(10))
-    st.write("**Preview data agregasi umur:**")
-    st.dataframe(age_df)
+with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
+    st.markdown("### 📊 Ringkasan Dataset")
+    
+    # Statistik Umum
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        st.metric("📋 Total Baris", f"{len(df):,}")
+    
+    with col2:
+        st.metric("🔽 Baris Terfilter", f"{len(df_filtered):,}")
+    
+    with col3:
+        st.metric("📍 Jumlah Kecamatan", f"{len(kec_df)}")
+    
+    with col4:
+        st.metric("📂 Jumlah Kolom", f"{len(df.columns)}")
+    
+    st.markdown("---")
+    
+    # Informasi Kolom
+    st.markdown("### 📋 Informasi Kolom Dataset")
+    
+    col_info = []
+    for idx, col in enumerate(df.columns, 1):
+        dtype = str(df[col].dtype)
+        null_count = df[col].isnull().sum()
+        null_pct = (null_count / len(df) * 100)
+        unique_count = df[col].nunique()
+        
+        col_info.append({
+            "No": idx,
+            "Nama Kolom": col,
+            "Tipe Data": dtype,
+            "Unique Values": f"{unique_count:,}",
+            "Missing Values": f"{null_count:,} ({null_pct:.1f}%)",
+            "Sample Data": str(df[col].iloc[0]) if len(df) > 0 else "N/A"
+        })
+    
+    df_col_info = pd.DataFrame(col_info)
+    
+    st.dataframe(
+        df_col_info,
+        use_container_width=True,
+        hide_index=True,
+        height=400
+    )
+    
+    st.markdown("---")
+    
+    # Preview Data
+    st.markdown("### 👀 Preview Data Agregasi")
+    
+    tab_preview1, tab_preview2, tab_preview3 = st.tabs([
+        "📍 Data per Kecamatan", 
+        "👶 Data per Kelompok Umur",
+        "🔍 Sample Data Mentah"
+    ])
+    
+    with tab_preview1:
+        st.markdown("**Top 10 Kecamatan berdasarkan Prevalensi:**")
+        preview_kec = kec_df.sort_values("prevalensi", ascending=False).head(10).copy()
+        preview_kec["prevalensi"] = preview_kec["prevalensi"].apply(lambda x: f"{x:.2f}%")
+        st.dataframe(
+            preview_kec,
+            use_container_width=True,
+            hide_index=True
+        )
+    
+    with tab_preview2:
+        st.markdown("**Data Prevalensi per Kelompok Umur:**")
+        if len(age_df) > 0:
+            preview_age = age_df.copy()
+            preview_age["prevalensi"] = preview_age["prevalensi"].apply(lambda x: f"{x:.2f}%")
+            st.dataframe(
+                preview_age,
+                use_container_width=True,
+                hide_index=True
+            )
+        else:
+            st.info("Tidak ada data kelompok umur")
+    
+    with tab_preview3:
+        st.markdown("**10 Baris Pertama Data Mentah (Terfilter):**")
+        st.dataframe(
+            df_filtered.head(10),
+            use_container_width=True,
+            height=400
+        )
+    
+    st.markdown("---")
+    
+    # Statistik Tambahan
+    st.markdown("### 📈 Statistik Tambahan")
+    
+    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    
+    with stat_col1:
+        st.markdown("**📊 Distribusi Data:**")
+        st.write(f"- **Total Kecamatan Unik:** {df['nama_kecamatan'].nunique()}")
+        st.write(f"- **Total NIK Unik:** {df['nik_balita'].nunique():,}")
+        st.write(f"- **Rentang Umur:** {df['umur_balita'].min():.0f} - {df['umur_balita'].max():.0f} bulan")
+    
+    with stat_col2:
+        st.markdown("**🎯 Data Quality:**")
+        total_missing = df.isnull().sum().sum()
+        missing_pct = (total_missing / (len(df) * len(df.columns)) * 100)
+        st.write(f"- **Total Missing Values:** {total_missing:,} ({missing_pct:.2f}%)")
+        st.write(f"- **Kelengkapan Data:** {100-missing_pct:.2f}%")
+        complete_rows = len(df.dropna())
+        st.write(f"- **Baris Lengkap:** {complete_rows:,} ({complete_rows/len(df)*100:.1f}%)")
+    
+    with stat_col3:
+        st.markdown("**⚖️ Balance Dataset:**")
+        stunting_count = df["is_stunting"].sum()
+        normal_count = len(df) - stunting_count
+        st.write(f"- **Stunting:** {stunting_count:,} ({stunting_count/len(df)*100:.1f}%)")
+        st.write(f"- **Normal:** {normal_count:,} ({normal_count/len(df)*100:.1f}%)")
+        balance_ratio = min(stunting_count, normal_count) / max(stunting_count, normal_count)
+        st.write(f"- **Balance Ratio:** {balance_ratio:.2f}")
+    
+    st.markdown("---")
+    
+    # Download Options
+    st.markdown("### 💾 Download Data")
+    
+    dl_col1, dl_col2, dl_col3 = st.columns(3)
+    
+    with dl_col1:
+        csv_full = df_filtered.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Data Terfilter (CSV)",
+            data=csv_full,
+            file_name="data_stunting_filtered.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    with dl_col2:
+        csv_kec = kec_df.to_csv(index=False).encode('utf-8')
+        st.download_button(
+            label="📥 Download Data Kecamatan (CSV)",
+            data=csv_kec,
+            file_name="data_prevalensi_kecamatan.csv",
+            mime="text/csv",
+            use_container_width=True
+        )
+    
+    with dl_col3:
+        if len(age_df) > 0:
+            csv_age = age_df.to_csv(index=False).encode('utf-8')
+            st.download_button(
+                label="📥 Download Data Umur (CSV)",
+                data=csv_age,
+                file_name="data_prevalensi_umur.csv",
+                mime="text/csv",
+                use_container_width=True
+            )
+        else:
+            st.button(
+                label="📥 Download Data Umur (CSV)",
+                disabled=True,
+                use_container_width=True
+            )
