@@ -958,13 +958,34 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
         null_pct = (null_count / len(df) * 100)
         unique_count = df[col].nunique()
         
+        # Ambil sample data dengan handling khusus
+        try:
+            if len(df) > 0:
+                sample_val = df[col].iloc[0]
+                
+                # Jika data terlalu panjang (seperti NIK terenkripsi), potong
+                if isinstance(sample_val, str) and len(sample_val) > 30:
+                    sample_data = sample_val[:30] + "..."
+                # Jika NIK atau nama, sembunyikan untuk privasi
+                elif col in ['nik_balita', 'nama_balita']:
+                    sample_data = "[PROTECTED]"
+                # Jika angka, format dengan baik
+                elif pd.notna(sample_val) and isinstance(sample_val, (int, float)):
+                    sample_data = f"{sample_val:.2f}" if isinstance(sample_val, float) else str(sample_val)
+                else:
+                    sample_data = str(sample_val)[:50]
+            else:
+                sample_data = "N/A"
+        except:
+            sample_data = "N/A"
+        
         col_info.append({
             "No": idx,
             "Nama Kolom": col,
             "Tipe Data": dtype,
             "Unique Values": f"{unique_count:,}",
             "Missing Values": f"{null_count:,} ({null_pct:.1f}%)",
-            "Sample Data": str(df[col].iloc[0]) if len(df) > 0 else "N/A"
+            "Sample Data": sample_data
         })
     
     df_col_info = pd.DataFrame(col_info)
@@ -1012,11 +1033,48 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
     
     with tab_preview3:
         st.markdown("**10 Baris Pertama Data Mentah (Terfilter):**")
-        st.dataframe(
-            df_filtered.head(10),
-            use_container_width=True,
-            height=400
-        )
+        
+        # Pilih kolom yang penting dan tampilkan dengan lebih baik
+        display_cols = [
+            'nama_kecamatan', 'umur_balita', 'jenis_kelamin_balita',
+            'bb_balita', 'tb_balita', 'stunting_balita'
+        ]
+        
+        # Filter hanya kolom yang ada
+        available_cols = [col for col in display_cols if col in df_filtered.columns]
+        
+        if len(available_cols) > 0:
+            preview_data = df_filtered[available_cols].head(10).copy()
+            
+            # Format data untuk tampilan lebih baik
+            if 'umur_balita' in preview_data.columns:
+                preview_data['umur_balita'] = preview_data['umur_balita'].apply(
+                    lambda x: f"{x:.0f} bulan" if pd.notna(x) else "N/A"
+                )
+            
+            if 'bb_balita' in preview_data.columns:
+                preview_data['bb_balita'] = preview_data['bb_balita'].apply(
+                    lambda x: f"{x:.1f} kg" if pd.notna(x) else "N/A"
+                )
+            
+            if 'tb_balita' in preview_data.columns:
+                preview_data['tb_balita'] = preview_data['tb_balita'].apply(
+                    lambda x: f"{x:.1f} cm" if pd.notna(x) else "N/A"
+                )
+            
+            st.dataframe(
+                preview_data,
+                use_container_width=True,
+                height=400
+            )
+        else:
+            st.dataframe(
+                df_filtered.head(10),
+                use_container_width=True,
+                height=400
+            )
+        
+        st.info("ℹ️ **Catatan:** Data pribadi seperti NIK dan Nama tidak ditampilkan untuk menjaga privasi.")
     
     st.markdown("---")
     
@@ -1029,7 +1087,18 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
         st.markdown("**📊 Distribusi Data:**")
         st.write(f"- **Total Kecamatan Unik:** {df['nama_kecamatan'].nunique()}")
         st.write(f"- **Total NIK Unik:** {df['nik_balita'].nunique():,}")
-        st.write(f"- **Rentang Umur:** {df['umur_balita'].min():.0f} - {df['umur_balita'].max():.0f} bulan")
+        
+        # Handle umur_balita dengan aman
+        try:
+            umur_valid = df['umur_balita'].dropna()
+            if len(umur_valid) > 0:
+                umur_min = umur_valid.min()
+                umur_max = umur_valid.max()
+                st.write(f"- **Rentang Umur:** {umur_min:.0f} - {umur_max:.0f} bulan")
+            else:
+                st.write(f"- **Rentang Umur:** Data tidak tersedia")
+        except:
+            st.write(f"- **Rentang Umur:** Data tidak valid")
     
     with stat_col2:
         st.markdown("**🎯 Data Quality:**")
