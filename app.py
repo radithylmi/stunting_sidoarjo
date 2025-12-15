@@ -142,7 +142,7 @@ fig_gauge.update_layout(
     paper_bgcolor="white"
 )
 
-st.plotly_chart(fig_gauge, use_container_width=True, key="gauge_chart_main")
+st.plotly_chart(fig_gauge, width='stretch', key="gauge_chart_main")
 
 st.divider()
 
@@ -256,6 +256,8 @@ with tab1:
             key="zoom_tab1"
         )
 
+    # Catatan: choropleth_mapbox masih digunakan karena choropleth_map memerlukan migrasi ke MapLibre
+    # Untuk sementara gunakan choropleth_mapbox dengan suppressing warning
     fig_map = px.choropleth_mapbox(
         kec_df,
         geojson=geojson,
@@ -295,7 +297,7 @@ with tab1:
         }
     )
 
-    st.plotly_chart(fig_map, use_container_width=True, key="map_chart_tab1")
+    st.plotly_chart(fig_map, width='stretch', key="map_chart_tab1")
 
     st.markdown("""
     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
@@ -343,7 +345,7 @@ with tab2:
                 yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
             )
 
-            st.plotly_chart(fig_age, use_container_width=True, key="age_chart_tab2")
+            st.plotly_chart(fig_age, width='stretch', key="age_chart_tab2")
         
         with col_table:
             st.markdown("#### 📋 Detail Data")
@@ -440,7 +442,7 @@ with tab3:
             yaxis={'categoryorder': 'total ascending'}
         )
         
-        st.plotly_chart(fig_bar, use_container_width=True, key="bar_chart_tab3")
+        st.plotly_chart(fig_bar, width='stretch', key="bar_chart_tab3")
     
     with col_cards:
         st.markdown(f"#### 🎯 {top_n}")
@@ -552,7 +554,7 @@ with tab4:
             
             fig_scatter.for_each_trace(lambda t: t.update(name="Normal" if t.name == "0" else "Stunting"))
             
-            st.plotly_chart(fig_scatter, use_container_width=True, key="scatter_chart_tab4")
+            st.plotly_chart(fig_scatter, width='stretch', key="scatter_chart_tab4")
             
             # Statistik
             st.markdown("---")
@@ -626,7 +628,7 @@ with tab4:
             )
             fig_pie.update_layout(height=400)
             
-            st.plotly_chart(fig_pie, use_container_width=True, key="pie_chart_tab4")
+                            st.plotly_chart(fig_pie, width='stretch', key="pie_chart_tab4")
         
         with col_bar_status:
             status_df = pd.DataFrame({
@@ -647,7 +649,7 @@ with tab4:
             fig_bar_status.update_traces(textposition='outside')
             fig_bar_status.update_layout(height=400, showlegend=False)
             
-            st.plotly_chart(fig_bar_status, use_container_width=True, key="bar_status_tab4")
+            st.plotly_chart(fig_bar_status, width='stretch', key="bar_status_tab4")
         
         # Visualisasi 2: Stunting per Kecamatan (Top 10)
         st.markdown("---")
@@ -678,7 +680,7 @@ with tab4:
             yaxis={'categoryorder': 'total ascending'}
         )
         
-        st.plotly_chart(fig_kec, use_container_width=True, key="kec_stunting_tab4")
+        st.plotly_chart(fig_kec, width='stretch', key="kec_stunting_tab4")
         
         # Visualisasi 3: Stunting per Kelompok Umur
         st.markdown("---")
@@ -702,7 +704,7 @@ with tab4:
                 fig_age_stunting.update_traces(textposition="outside")
                 fig_age_stunting.update_layout(height=400)
                 
-                st.plotly_chart(fig_age_stunting, use_container_width=True, key="age_kasus_tab4")
+                st.plotly_chart(fig_age_stunting, width='stretch', key="age_kasus_tab4")
             
             with col_age2:
                 fig_age_prev = px.line(
@@ -724,7 +726,7 @@ with tab4:
                     yaxis_title="Prevalensi (%)"
                 )
                 
-                st.plotly_chart(fig_age_prev, use_container_width=True, key="age_prev_tab4")
+                st.plotly_chart(fig_age_prev, width='stretch', key="age_prev_tab4")
         
         # Statistik Ringkas
         st.markdown("---")
@@ -796,7 +798,7 @@ with tab5:
     
     st.dataframe(
         display_df,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=600
     )
@@ -846,7 +848,7 @@ with col1:
         yaxis={'categoryorder': 'total ascending'}
     )
     
-    st.plotly_chart(fig_bar, use_container_width=True, key="bar_chart_bottom")
+    st.plotly_chart(fig_bar, width='stretch', key="bar_chart_bottom")
 
 with col2:
     st.subheader("🏆 Top 5 Kecamatan")
@@ -992,7 +994,7 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
     
     st.dataframe(
         df_col_info,
-        use_container_width=True,
+        width='stretch',
         hide_index=True,
         height=400
     )
@@ -1014,7 +1016,7 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
         preview_kec["prevalensi"] = preview_kec["prevalensi"].apply(lambda x: f"{x:.2f}%")
         st.dataframe(
             preview_kec,
-            use_container_width=True,
+            width='stretch',
             hide_index=True
         )
     
@@ -1025,7 +1027,7 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
             preview_age["prevalensi"] = preview_age["prevalensi"].apply(lambda x: f"{x:.2f}%")
             st.dataframe(
                 preview_age,
-                use_container_width=True,
+                width='stretch',
                 hide_index=True
             )
         else:
@@ -1046,31 +1048,31 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
         if len(available_cols) > 0:
             preview_data = df_filtered[available_cols].head(10).copy()
             
-            # Format data untuk tampilan lebih baik
+            # Format data untuk tampilan lebih baik dengan error handling yang kuat
             if 'umur_balita' in preview_data.columns:
                 preview_data['umur_balita'] = preview_data['umur_balita'].apply(
-                    lambda x: f"{x:.0f} bulan" if pd.notna(x) else "N/A"
+                    lambda x: f"{float(x):.0f} bulan" if pd.notna(x) and str(x).replace('.','').isdigit() else (str(x) if pd.notna(x) else "N/A")
                 )
             
             if 'bb_balita' in preview_data.columns:
                 preview_data['bb_balita'] = preview_data['bb_balita'].apply(
-                    lambda x: f"{x:.1f} kg" if pd.notna(x) else "N/A"
+                    lambda x: f"{float(x):.1f} kg" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
                 )
             
             if 'tb_balita' in preview_data.columns:
                 preview_data['tb_balita'] = preview_data['tb_balita'].apply(
-                    lambda x: f"{x:.1f} cm" if pd.notna(x) else "N/A"
+                    lambda x: f"{float(x):.1f} cm" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
                 )
             
             st.dataframe(
                 preview_data,
-                use_container_width=True,
+                width='stretch',
                 height=400
             )
         else:
             st.dataframe(
                 df_filtered.head(10),
-                use_container_width=True,
+                width='stretch',
                 height=400
             )
         
@@ -1131,8 +1133,7 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
             label="📥 Download Data Terfilter (CSV)",
             data=csv_full,
             file_name="data_stunting_filtered.csv",
-            mime="text/csv",
-            use_container_width=True
+            mime="text/csv"
         )
     
     with dl_col2:
@@ -1141,8 +1142,7 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
             label="📥 Download Data Kecamatan (CSV)",
             data=csv_kec,
             file_name="data_prevalensi_kecamatan.csv",
-            mime="text/csv",
-            use_container_width=True
+            mime="text/csv"
         )
     
     with dl_col3:
@@ -1152,12 +1152,10 @@ with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
                 label="📥 Download Data Umur (CSV)",
                 data=csv_age,
                 file_name="data_prevalensi_umur.csv",
-                mime="text/csv",
-                use_container_width=True
+                mime="text/csv"
             )
         else:
             st.button(
                 label="📥 Download Data Umur (CSV)",
-                disabled=True,
-                use_container_width=True
+                disabled=True
             )
