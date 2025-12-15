@@ -123,10 +123,6 @@ with col_style:
             "Default (Light)", 
             "Default (Dark)",
             "Street Map",
-            "Outdoor/Topografi",
-            "Minimalis",
-            "Stamen Terrain",
-            "Stamen Toner"
         ],
         index=0
     )
@@ -136,10 +132,6 @@ with col_style:
         "Default (Light)": "carto-positron",
         "Default (Dark)": "carto-darkmatter",
         "Street Map": "open-street-map",
-        "Outdoor/Topografi": "stamen-terrain",
-        "Minimalis": "basic",
-        "Stamen Terrain": "stamen-terrain",
-        "Stamen Toner": "stamen-toner"
     }
     mapbox_style = style_mapping[map_style]
 
@@ -431,3 +423,4 @@ with st.expander("🧪 Debug Data"):
     st.write("**Jumlah kecamatan:**", len(kec_df))
     st.write("**Preview data agregasi:**")
     st.dataframe(kec_df.head(10))
+
