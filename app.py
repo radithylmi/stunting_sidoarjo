@@ -1,118 +1,112 @@
-# =====================================================
-# STREAMLIT DASHBOARD STUNTING SIDOARJO
-# TANPA GEOPANDAS
-# =====================================================
-
 import streamlit as st
 import pandas as pd
 import numpy as np
 import json
 import plotly.express as px
 
-# -----------------------------------------------------
-# PAGE CONFIG
-# -----------------------------------------------------
 st.set_page_config(
-    page_title="Dashboard Stunting Sidoarjo",
-    layout="wide",
-    page_icon="📊"
+    page_title="Dashboard Stunting Kabupaten Sidoarjo",
+    layout="wide"
 )
 
-st.title("📊 Dashboard Stunting Kabupaten Sidoarjo")
-
-# -----------------------------------------------------
+# ===============================
 # LOAD DATA
-# -----------------------------------------------------
+# ===============================
 @st.cache_data
 def load_data():
     df = pd.read_csv("data_skrinning_stunting(1).csv")
-    df.columns = df.columns.str.lower().str.replace(" ", "_")
-    df["nama_kecamatan"] = df["nama_kecamatan"].str.upper()
+
+    df.columns = (
+        df.columns
+        .str.lower()
+        .str.replace(" ", "_")
+        .str.replace(".", "", regex=False)
+    )
+
+    # Normalisasi nama kecamatan (INI KUNCI MAP MUNCUL)
+    df["nama_kecamatan"] = (
+        df["nama_kecamatan"]
+        .astype(str)
+        .str.upper()
+        .str.strip()
+    )
+
+    df["is_stunting"] = df["stunting_balita"].map({"Ya": 1, "Tidak": 0})
+
     return df
+
 
 @st.cache_data
 def load_geojson():
     with open("kecamatan_sidoarjo.geojson", "r", encoding="utf-8") as f:
         geojson = json.load(f)
+
+    # Normalisasi NAMOBJ
+    for feat in geojson["features"]:
+        feat["properties"]["NAMOBJ"] = (
+            feat["properties"]["NAMOBJ"]
+            .upper()
+            .strip()
+        )
+
     return geojson
+
 
 df = load_data()
 geojson = load_geojson()
 
-# -----------------------------------------------------
-# FEATURE ENGINEERING
-# -----------------------------------------------------
-df["is_stunting"] = df["stunting_balita"].apply(lambda x: 1 if x == "Ya" else 0)
-
-def kategori_umur(umur):
-    if pd.isna(umur):
-        return "Tidak diketahui"
-    tahun, bulan = 0, 0
-    parts = umur.split()
-    for i, p in enumerate(parts):
-        if p.isdigit() and i + 1 < len(parts):
-            if parts[i+1].lower() == "tahun":
-                tahun = int(p)
-            elif parts[i+1].lower() == "bulan":
-                bulan = int(p)
-    total = tahun * 12 + bulan
-    if total <= 12:
-        return "0–12 Bulan"
-    elif total <= 24:
-        return "13–24 Bulan"
-    elif total <= 36:
-        return "25–36 Bulan"
-    else:
-        return "37–60 Bulan"
-
-df["kelompok_umur"] = df["umur_balita"].apply(kategori_umur)
-
-# -----------------------------------------------------
+# ===============================
 # SIDEBAR FILTER
-# -----------------------------------------------------
+# ===============================
 st.sidebar.header("🔎 Filter Data")
 
-kec_filter = st.sidebar.selectbox(
-    "Pilih Kecamatan",
-    ["Semua"] + sorted(df["nama_kecamatan"].unique())
+# FILTER UMUR
+umur_opsi = sorted(df["umur_balita"].dropna().unique())
+umur_pilih = st.sidebar.multiselect(
+    "Pilih Umur Balita",
+    umur_opsi,
+    default=umur_opsi
 )
 
-umur_filter = st.sidebar.multiselect(
-    "Pilih Kelompok Umur",
-    sorted(df["kelompok_umur"].unique()),
-    default=sorted(df["kelompok_umur"].unique())
-)
+df = df[df["umur_balita"].isin(umur_pilih)]
 
-if kec_filter != "Semua":
-    df = df[df["nama_kecamatan"] == kec_filter]
-
-df = df[df["kelompok_umur"].isin(umur_filter)]
-
-# -----------------------------------------------------
+# ===============================
 # KPI
-# -----------------------------------------------------
-total = len(df)
-kasus = df["is_stunting"].sum()
-prev = (kasus / total * 100) if total else 0
+# ===============================
+total_balita = len(df)
+total_kasus = int(df["is_stunting"].sum())
+prevalensi = (total_kasus / total_balita * 100) if total_balita > 0 else 0
+
+st.title("📊 Dashboard Stunting Kabupaten Sidoarjo")
 
 c1, c2, c3 = st.columns(3)
-c1.metric("Total Balita", total)
-c2.metric("Kasus Stunting", kasus)
-c3.metric("Prevalensi", f"{prev:.2f}%")
+c1.metric("👶 Total Balita", total_balita)
+c2.metric("🚨 Kasus Stunting", total_kasus)
+c3.metric("📉 Prevalensi", f"{prevalensi:.2f}%")
 
-# -----------------------------------------------------
+st.divider()
+
+# ===============================
 # AGREGASI KECAMATAN
-# -----------------------------------------------------
+# ===============================
 kec_df = (
-    df.groupby("nama_kecamatan")["is_stunting"]
-    .agg(total_kasus="sum", total_balita="count")
+    df.groupby("nama_kecamatan")
+    .agg(
+        total_balita=("is_stunting", "count"),
+        total_kasus=("is_stunting", "sum")
+    )
     .reset_index()
 )
-kec_df["prevalensi"] = kec_df["total_kasus"] / kec_df["total_balita"] * 100
 
-# -----------------------------------------------------
-# CHOROPLETH MAP (TANPA GEOPANDAS)
-# -----------------------------------------------------
+kec_df["prevalensi"] = (
+    kec_df["total_kasus"] / kec_df["total_balita"] * 100
+)
+
+# ===============================
+# MAP (PASTI MUNCUL)
+# ===============================
+st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
+
 fig_map = px.choropleth(
     kec_df,
     geojson=geojson,
@@ -120,29 +114,50 @@ fig_map = px.choropleth(
     featureidkey="properties.NAMOBJ",
     color="prevalensi",
     color_continuous_scale="Reds",
-    hover_data=["total_kasus", "total_balita"],
-    title="🗺️ Peta Prevalensi Stunting per Kecamatan"
+    range_color=(0, kec_df["prevalensi"].max() if len(kec_df) > 0 else 1),
+    hover_name="nama_kecamatan",
+    hover_data={
+        "total_balita": True,
+        "total_kasus": True,
+        "prevalensi": ":.2f"
+    }
 )
 
-fig_map.update_geos(fitbounds="locations", visible=False)
-
-# -----------------------------------------------------
-# BAR UMUR
-# -----------------------------------------------------
-umur_df = (
-    df.groupby("kelompok_umur")["is_stunting"]
-    .mean()
-    .reset_index()
-)
-umur_df["prevalensi"] = umur_df["is_stunting"] * 100
-
-fig_umur = px.bar(
-    umur_df,
-    x="kelompok_umur",
-    y="prevalensi",
-    title="📊 Prevalensi Stunting Berdasarkan Umur",
-    text=umur_df["prevalensi"].round(1)
+fig_map.update_geos(
+    fitbounds="locations",
+    visible=False
 )
 
-# ---------------------------------------------------
+fig_map.update_layout(
+    margin={"r":0,"t":0,"l":0,"b":0}
+)
 
+st.plotly_chart(fig_map, use_container_width=True)
+
+# ===============================
+# BAR CHART KECAMATAN
+# ===============================
+st.subheader("📍 Top Kecamatan dengan Prevalensi Tertinggi")
+
+fig_bar = px.bar(
+    kec_df.sort_values("prevalensi", ascending=False).head(10),
+    x="prevalensi",
+    y="nama_kecamatan",
+    orientation="h",
+    text=kec_df.sort_values("prevalensi", ascending=False)
+        .head(10)["prevalensi"].round(2).astype(str) + "%"
+)
+
+fig_bar.update_layout(
+    xaxis_title="Prevalensi (%)",
+    yaxis_title="Kecamatan"
+)
+
+st.plotly_chart(fig_bar, use_container_width=True)
+
+# ===============================
+# DEBUG (AMAN DIHAPUS NANTI)
+# ===============================
+with st.expander("🧪 Debug Data"):
+    st.write("Jumlah baris:", len(df))
+    st.dataframe(kec_df.head())
