@@ -250,19 +250,81 @@ with stat_col4:
     )
 
 # ===============================
-# TABEL DATA
+# TABEL DATA DENGAN GRADIENT (TANPA MATPLOTLIB)
 # ===============================
 with st.expander("📋 Lihat Data Lengkap per Kecamatan"):
-    st.dataframe(
-        kec_df.sort_values("prevalensi", ascending=False)
-        .style.format({
-            "prevalensi": "{:.2f}%",
-            "total_balita": "{:,}",
-            "total_kasus": "{:,}"
-        })
-        .background_gradient(subset=["prevalensi"], cmap="Reds"),
-        use_container_width=True
-    )
+    kec_sorted = kec_df.sort_values("prevalensi", ascending=False).reset_index(drop=True)
+    
+    # Buat HTML table dengan gradient
+    max_prev = kec_sorted["prevalensi"].max()
+    min_prev = kec_sorted["prevalensi"].min()
+    
+    html_table = """
+    <style>
+        .custom-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-family: 'Source Sans Pro', sans-serif;
+        }
+        .custom-table th {
+            background-color: #f0f2f6;
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+            border-bottom: 2px solid #ddd;
+        }
+        .custom-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .custom-table tr:hover {
+            background-color: #f9fafb;
+        }
+    </style>
+    <table class="custom-table">
+        <thead>
+            <tr>
+                <th style="width: 5%;">Rank</th>
+                <th style="width: 35%;">Kecamatan</th>
+                <th style="width: 20%;">Total Balita</th>
+                <th style="width: 20%;">Kasus Stunting</th>
+                <th style="width: 20%;">Prevalensi</th>
+            </tr>
+        </thead>
+        <tbody>
+    """
+    
+    for idx, row in kec_sorted.iterrows():
+        # Hitung intensitas warna berdasarkan prevalensi
+        if max_prev > min_prev:
+            intensity = (row["prevalensi"] - min_prev) / (max_prev - min_prev)
+        else:
+            intensity = 0.5
+        
+        # Warna gradient dari putih ke merah
+        red = 255
+        green = int(255 * (1 - intensity * 0.8))
+        blue = int(255 * (1 - intensity * 0.8))
+        bg_color = f"rgb({red}, {green}, {blue})"
+        
+        html_table += f"""
+        <tr>
+            <td style="text-align: center; font-weight: 600;">#{idx + 1}</td>
+            <td><strong>{row['nama_kecamatan']}</strong></td>
+            <td style="text-align: right;">{row['total_balita']:,}</td>
+            <td style="text-align: right;">{row['total_kasus']:,}</td>
+            <td style="text-align: right; background-color: {bg_color}; font-weight: 600;">
+                {row['prevalensi']:.2f}%
+            </td>
+        </tr>
+        """
+    
+    html_table += """
+        </tbody>
+    </table>
+    """
+    
+    st.markdown(html_table, unsafe_allow_html=True)
 
 # ===============================
 # DEBUG
