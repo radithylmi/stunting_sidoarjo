@@ -147,144 +147,494 @@ st.plotly_chart(fig_gauge, use_container_width=True)
 st.divider()
 
 # ===============================
-# AGREGASI KECAMATAN
+# TAB NAVIGATION UNTUK BERBAGAI VISUALISASI
 # ===============================
-kec_df = (
-    df_filtered.groupby("nama_kecamatan")
-    .agg(
-        total_balita=("is_stunting", "count"),
-        total_kasus=("is_stunting", "sum")
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "🗺️ Peta Prevalensi",
+    "📊 Kelompok Umur", 
+    "🏆 Ranking Kecamatan",
+    "🔬 Diagnostik Z-Score",
+    "📋 Data Lengkap"
+])
+
+# ===============================
+# TAB 1: PETA PREVALENSI
+# ===============================
+with tab1:
+    st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
+
+    col_style, col_color, col_zoom = st.columns([2, 2, 1])
+
+    with col_style:
+        map_style = st.selectbox(
+            "🗺️ Style Peta:",
+            [
+                "Default (Light)", 
+                "Default (Dark)",
+                "Street Map",
+                "Outdoor/Topografi",
+                "Minimalis",
+                "Stamen Terrain",
+                "Stamen Toner"
+            ],
+            index=0,
+            key="map_style_tab1"
+        )
+        
+        style_mapping = {
+            "Default (Light)": "carto-positron",
+            "Default (Dark)": "carto-darkmatter",
+            "Street Map": "open-street-map",
+            "Outdoor/Topografi": "stamen-terrain",
+            "Minimalis": "basic",
+            "Stamen Terrain": "stamen-terrain",
+            "Stamen Toner": "stamen-toner"
+        }
+        mapbox_style = style_mapping[map_style]
+
+    with col_color:
+        color_scheme = st.selectbox(
+            "🎨 Skema Warna:",
+            ["RdYlGn_r", "Turbo", "Jet", "Hot", "Rainbow", "Portland", "Picnic", "Reds"],
+            index=0,
+            key="color_scheme_tab1"
+        )
+
+    with col_zoom:
+        zoom_level = st.slider(
+            "🔍 Zoom:",
+            min_value=8,
+            max_value=13,
+            value=10,
+            step=1,
+            key="zoom_tab1"
+        )
+
+    fig_map = px.choropleth_mapbox(
+        kec_df,
+        geojson=geojson,
+        locations="nama_kecamatan",
+        featureidkey="properties.NAMOBJ",
+        color="prevalensi",
+        color_continuous_scale=color_scheme,
+        range_color=(0, 100),
+        mapbox_style=mapbox_style,
+        center={"lat": -7.45, "lon": 112.71},
+        zoom=zoom_level,
+        opacity=0.85,
+        hover_name="nama_kecamatan",
+        hover_data={
+            "nama_kecamatan": False,
+            "total_balita": ":,",
+            "total_kasus": ":,",
+            "prevalensi": ":.2f"
+        },
+        labels={
+            "prevalensi": "Prevalensi (%)",
+            "total_balita": "Total Balita",
+            "total_kasus": "Kasus Stunting"
+        }
     )
-    .reset_index()
-)
-kec_df["prevalensi"] = (
-    kec_df["total_kasus"] / kec_df["total_balita"] * 100
-)
+
+    fig_map.update_layout(
+        margin={"r": 0, "t": 0, "l": 0, "b": 0},
+        height=600,
+        coloraxis_colorbar={
+            "title": "Prevalensi<br>Stunting (%)",
+            "thickness": 20,
+            "len": 0.7,
+            "x": 1.02,
+            "tickvals": [0, 20, 40, 60, 80, 100],
+            "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
+        }
+    )
+
+    st.plotly_chart(fig_map, use_container_width=True)
+
+    st.markdown("""
+    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
+        <strong>📌 Keterangan Prevalensi:</strong><br>
+        • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Sangat Tinggi (≥80%)<br>
+        • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Tinggi (60-79%)<br>
+        • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Sedang (40-59%)<br>
+        • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Rendah (20-39%)<br>
+        • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Sangat Rendah (<20%)
+    </div>
+    """, unsafe_allow_html=True)
 
 # ===============================
-# MAP DENGAN STYLE SEPERTI GOOGLE MAPS
+# TAB 2: KELOMPOK UMUR
 # ===============================
-st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
+with tab2:
+    st.subheader("📊 Fase Kritis: Prevalensi Berdasarkan Kelompok Umur")
+    
+    # Cek apakah ada data
+    if len(age_df) > 0:
+        col_chart, col_table = st.columns([2, 1])
+        
+        with col_chart:
+            fig_age = px.bar(
+                age_df,
+                x="kelompok_umur",
+                y="prevalensi",
+                text=age_df["prevalensi"].round(1).astype(str) + "%",
+                color="prevalensi",
+                color_continuous_scale="Plasma",
+                labels={
+                    "kelompok_umur": "Kelompok Umur",
+                    "prevalensi": "Prevalensi Stunting (%)"
+                }
+            )
 
-col_style, col_color, col_zoom = st.columns([2, 2, 1])
+            fig_age.update_traces(
+                textposition="outside",
+                textfont_size=14
+            )
 
-with col_style:
-    map_style = st.selectbox(
-        "🗺️ Style Peta:",
-        [
-            "Default (Light)", 
-            "Default (Dark)",
-            "Street Map",
-            "Outdoor/Topografi",
-            "Minimalis",
-            "Stamen Terrain",
-            "Stamen Toner"
-        ],
-        index=0
+            fig_age.update_layout(
+                height=500,
+                showlegend=False,
+                yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
+            )
+
+            st.plotly_chart(fig_age, use_container_width=True)
+        
+        with col_table:
+            st.markdown("#### 📋 Detail Data")
+            for _, row in age_df.iterrows():
+                st.markdown(f"""
+                <div style="
+                    background-color: #f8f9fa;
+                    padding: 12px;
+                    border-radius: 8px;
+                    margin-bottom: 10px;
+                    border-left: 4px solid #6366f1;
+                ">
+                    <div style="font-size: 13px; color: #666; font-weight: 600;">
+                        {row['kelompok_umur']}
+                    </div>
+                    <div style="font-size: 24px; color: #6366f1; font-weight: bold; margin: 5px 0;">
+                        {row['prevalensi']:.1f}%
+                    </div>
+                    <div style="font-size: 12px; color: #888;">
+                        {row['total_kasus']:,} / {row['total_balita']:,} balita
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
+        
+        # Insight
+        st.markdown("---")
+        st.subheader("💡 Insight")
+        
+        max_idx = age_df["prevalensi"].idxmax()
+        max_age_group = age_df.loc[max_idx, "kelompok_umur"]
+        max_prevalensi = age_df.loc[max_idx, "prevalensi"]
+        
+        min_idx = age_df["prevalensi"].idxmin()
+        min_age_group = age_df.loc[min_idx, "kelompok_umur"]
+        min_prevalensi = age_df.loc[min_idx, "prevalensi"]
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            st.error(f"🔴 **Kelompok Tertinggi:** {max_age_group} ({max_prevalensi:.1f}%)")
+        with col2:
+            st.success(f"🟢 **Kelompok Terendah:** {min_age_group} ({min_prevalensi:.1f}%)")
+    else:
+        st.warning("⚠️ Tidak ada data untuk ditampilkan. Silakan sesuaikan filter.")
+
+# ===============================
+# TAB 3: RANKING KECAMATAN
+# ===============================
+with tab3:
+    st.subheader("🏆 Ranking Kecamatan Berdasarkan Prevalensi")
+    
+    # Pilihan Top N
+    top_n = st.radio(
+        "Tampilkan:",
+        ["Top 5", "Top 10", "Top 15", "Semua Kecamatan"],
+        horizontal=True,
+        key="top_n_radio"
     )
     
-    style_mapping = {
-        "Default (Light)": "carto-positron",
-        "Default (Dark)": "carto-darkmatter",
-        "Street Map": "open-street-map",
-        "Outdoor/Topografi": "stamen-terrain",
-        "Minimalis": "basic",
-        "Stamen Terrain": "stamen-terrain",
-        "Stamen Toner": "stamen-toner"
-    }
-    mapbox_style = style_mapping[map_style]
-
-with col_color:
-    color_scheme = st.selectbox(
-        "🎨 Skema Warna:",
-        ["RdYlGn_r", "Turbo", "Jet", "Hot", "Rainbow", "Portland", "Picnic", "Reds"],
-        index=0
-    )
-
-with col_zoom:
-    zoom_level = st.slider(
-        "🔍 Zoom:",
-        min_value=8,
-        max_value=13,
-        value=10,
-        step=1
-    )
-
-fig_map = px.choropleth_mapbox(
-    kec_df,
-    geojson=geojson,
-    locations="nama_kecamatan",
-    featureidkey="properties.NAMOBJ",
-    color="prevalensi",
-    color_continuous_scale=color_scheme,
-    range_color=(0, 100),
-    mapbox_style=mapbox_style,
-    center={"lat": -7.45, "lon": 112.71},
-    zoom=zoom_level,
-    opacity=0.85,
-    hover_name="nama_kecamatan",
-    hover_data={
-        "nama_kecamatan": False,
-        "total_balita": ":,",
-        "total_kasus": ":,",
-        "prevalensi": ":.2f"
-    },
-    labels={
-        "prevalensi": "Prevalensi (%)",
-        "total_balita": "Total Balita",
-        "total_kasus": "Kasus Stunting"
-    }
-)
-
-fig_map.update_layout(
-    margin={"r": 0, "t": 0, "l": 0, "b": 0},
-    height=600,
-    coloraxis_colorbar={
-        "title": "Prevalensi<br>Stunting (%)",
-        "thickness": 20,
-        "len": 0.7,
-        "x": 1.02,
-        "tickvals": [0, 20, 40, 60, 80, 100],
-        "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
-    }
-)
-
-st.plotly_chart(fig_map, use_container_width=True)
-
-st.markdown("""
-<div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
-    <strong>📌 Keterangan Prevalensi:</strong><br>
-    • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Sangat Tinggi (≥80%)<br>
-    • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Tinggi (60-79%)<br>
-    • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Sedang (40-59%)<br>
-    • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Rendah (20-39%)<br>
-    • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Sangat Rendah (<20%)
-</div>
-""", unsafe_allow_html=True)
-
-st.divider()
+    # Tentukan jumlah data
+    if top_n == "Top 5":
+        n = 5
+    elif top_n == "Top 10":
+        n = 10
+    elif top_n == "Top 15":
+        n = 15
+    else:
+        n = len(kec_df)
+    
+    top_data = kec_df.sort_values("prevalensi", ascending=False).head(n)
+    
+    col_chart, col_cards = st.columns([2, 1])
+    
+    with col_chart:
+        fig_bar = px.bar(
+            top_data,
+            x="prevalensi",
+            y="nama_kecamatan",
+            orientation="h",
+            text=top_data["prevalensi"].round(2).astype(str) + "%",
+            color="prevalensi",
+            color_continuous_scale="Reds"
+        )
+        
+        fig_bar.update_traces(
+            textposition="outside",
+            textfont_size=12
+        )
+        
+        fig_bar.update_layout(
+            xaxis_title="Prevalensi (%)",
+            yaxis_title="",
+            showlegend=False,
+            height=max(500, n * 40),
+            yaxis={'categoryorder': 'total ascending'}
+        )
+        
+        st.plotly_chart(fig_bar, use_container_width=True)
+    
+    with col_cards:
+        st.markdown(f"#### 🎯 {top_n}")
+        
+        for i, (idx, row) in enumerate(top_data.head(5).iterrows(), 1):
+            if i == 1:
+                border_color = "#dc2626"
+                bg_color = "#fee2e2"
+            elif i == 2:
+                border_color = "#ea580c"
+                bg_color = "#ffedd5"
+            elif i == 3:
+                border_color = "#f59e0b"
+                bg_color = "#fef3c7"
+            else:
+                border_color = "#f97316"
+                bg_color = "#fff7ed"
+            
+            st.markdown(f"""
+            <div style="
+                background-color: {bg_color};
+                padding: 12px;
+                border-radius: 10px;
+                margin-bottom: 10px;
+                border-left: 5px solid {border_color};
+                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            ">
+                <div style="font-size: 12px; color: #666; font-weight: 600;">
+                    #{i} {row['nama_kecamatan']}
+                </div>
+                <div style="font-size: 28px; color: {border_color}; font-weight: bold; margin: 5px 0;">
+                    {row['prevalensi']:.2f}%
+                </div>
+                <div style="font-size: 11px; color: #666;">
+                    {row['total_kasus']:,} / {row['total_balita']:,} balita
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Statistik
+    st.markdown("---")
+    st.subheader("📊 Statistik")
+    
+    stat_col1, stat_col2, stat_col3 = st.columns(3)
+    
+    with stat_col1:
+        st.metric(
+            f"Rata-rata Prevalensi ({top_n})",
+            f"{top_data['prevalensi'].mean():.2f}%"
+        )
+    
+    with stat_col2:
+        st.metric(
+            "Kecamatan Tertinggi",
+            f"{top_data.iloc[0]['nama_kecamatan']}",
+            f"{top_data.iloc[0]['prevalensi']:.1f}%"
+        )
+    
+    with stat_col3:
+        total_kasus_top = top_data["total_kasus"].sum()
+        st.metric(
+            f"Total Kasus ({top_n})",
+            f"{total_kasus_top:,}"
+        )
 
 # ===============================
-# PREVALENSI PER KELOMPOK UMUR
+# TAB 4: DIAGNOSTIK Z-SCORE
 # ===============================
-st.subheader("📊 Fase Kritis: Prevalensi Berdasarkan Kelompok Umur")
+with tab4:
+    st.subheader("🔬 Diagnostik Z-Score (TB/U vs BB/U)")
+    
+    # Cek kolom z-score
+    zscore_cols = [col for col in df_filtered.columns if 'z' in col.lower() and 'score' in col.lower()]
+    
+    if len(zscore_cols) >= 2:
+        col_z1, col_z2 = st.columns(2)
+        
+        with col_z1:
+            col_tbu = st.selectbox("📏 Pilih Kolom TB/U", zscore_cols, key="tbu_tab4")
+        
+        with col_z2:
+            col_bbu = st.selectbox("⚖️ Pilih Kolom BB/U", zscore_cols, key="bbu_tab4", index=min(1, len(zscore_cols)-1))
+        
+        # Bersihkan data
+        df_plot = df_filtered[[col_tbu, col_bbu, "is_stunting"]].copy().dropna()
+        df_plot = df_plot.loc[:, ~df_plot.columns.duplicated()]
+        
+        if col_tbu != col_bbu and len(df_plot) > 0:
+            fig_scatter = px.scatter(
+                df_plot,
+                x=col_tbu,
+                y=col_bbu,
+                color="is_stunting",
+                color_discrete_map={0: "green", 1: "red"},
+                labels={
+                    col_tbu: "Z-Score TB/U",
+                    col_bbu: "Z-Score BB/U",
+                    "is_stunting": "Status"
+                }
+            )
+            
+            fig_scatter.add_hline(y=-2, line_dash="dash", line_color="orange", annotation_text="Threshold BB/U (-2)")
+            fig_scatter.add_vline(x=-2, line_dash="dash", line_color="orange", annotation_text="Threshold TB/U (-2)")
+            
+            fig_scatter.update_layout(
+                height=600,
+                showlegend=True
+            )
+            
+            fig_scatter.for_each_trace(lambda t: t.update(name="Normal" if t.name == "0" else "Stunting"))
+            
+            st.plotly_chart(fig_scatter, use_container_width=True)
+            
+            # Statistik
+            st.markdown("---")
+            col1, col2, col3, col4 = st.columns(4)
+            
+            stunting = df_plot[df_plot["is_stunting"] == 1]
+            normal = df_plot[df_plot["is_stunting"] == 0]
+            
+            with col1:
+                st.metric("Total Balita", len(df_plot))
+            
+            with col2:
+                st.metric("Stunting", len(stunting), delta=f"{len(stunting)/len(df_plot)*100:.1f}%")
+            
+            with col3:
+                if len(stunting) > 0:
+                    st.metric("Rata-rata TB/U (Stunting)", f"{stunting[col_tbu].mean():.2f}")
+                else:
+                    st.metric("Rata-rata TB/U (Stunting)", "N/A")
+            
+            with col4:
+                if len(normal) > 0:
+                    st.metric("Rata-rata TB/U (Normal)", f"{normal[col_tbu].mean():.2f}")
+                else:
+                    st.metric("Rata-rata TB/U (Normal)", "N/A")
+            
+            # Interpretasi
+            st.markdown("---")
+            st.subheader("💡 Interpretasi Z-Score")
+            
+            st.info("""
+            **Klasifikasi Z-Score WHO:**
+            - **Normal**: Z-Score ≥ -2 SD
+            - **Stunted (Pendek)**: -3 SD ≤ Z-Score < -2 SD
+            - **Severely Stunted (Sangat Pendek)**: Z-Score < -3 SD
+            
+            **Kuadran pada scatter plot:**
+            - 🟢 **Kanan atas**: Normal TB/U dan BB/U
+            - 🔴 **Kiri bawah**: Berisiko stunting dan underweight
+            - 🟡 **Kiri atas**: Pendek tapi berat badan cukup
+            - 🟡 **Kanan bawah**: Tinggi normal tapi underweight
+            """)
+        else:
+            if col_tbu == col_bbu:
+                st.warning("⚠️ Pilih kolom yang berbeda untuk TB/U dan BB/U")
+            else:
+                st.warning("⚠️ Tidak ada data untuk ditampilkan setelah filter diterapkan")
+    else:
+        st.info("ℹ️ Kolom Z-Score tidak tersedia dalam dataset. Scatter plot tidak dapat ditampilkan.")
+        
+        st.markdown("---")
+        st.subheader("📊 Alternatif: Distribusi Status Stunting")
+        
+        status_count = df_filtered["is_stunting"].value_counts()
+        
+        fig_pie = px.pie(
+            values=status_count.values,
+            names=["Normal", "Stunting"],
+            color_discrete_sequence=["green", "red"],
+            hole=0.4
+        )
+        
+        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
+        fig_pie.update_layout(height=500)
+        
+        st.plotly_chart(fig_pie, use_container_width=True)
+
+# ===============================
+# TAB 5: DATA LENGKAP
+# ===============================
+with tab5:
+    st.subheader("📋 Data Lengkap per Kecamatan")
+    
+    kec_sorted = kec_df.sort_values("prevalensi", ascending=False).reset_index(drop=True)
+    kec_sorted.insert(0, "Rank", range(1, len(kec_sorted) + 1))
+    
+    display_df = pd.DataFrame({
+        "Rank": kec_sorted["Rank"].apply(lambda x: f"#{x}"),
+        "Kecamatan": kec_sorted["nama_kecamatan"],
+        "Total Balita": kec_sorted["total_balita"],
+        "Kasus Stunting": kec_sorted["total_kasus"],
+        "Prevalensi": kec_sorted["prevalensi"].apply(lambda x: f"{x:.2f}%")
+    })
+    
+    st.dataframe(
+        display_df,
+        use_container_width=True,
+        hide_index=True,
+        height=600
+    )
+    
+    # Download button
+    st.markdown("---")
+    csv = kec_sorted.to_csv(index=False).encode('utf-8')
+    st.download_button(
+        label="📥 Download Data CSV",
+        data=csv,
+        file_name="data_prevalensi_kecamatan.csv",
+        mime="text/csv"
+    )
 
 def categorize_age(age):
-    if age <= 12:
-        return "0-12 Bulan"
-    elif age <= 24:
-        return "13-24 Bulan"
-    elif age <= 36:
-        return "25-36 Bulan"
-    else:
-        return "37-60 Bulan"
+    try:
+        age = float(age)
+        if pd.isna(age):
+            return "Unknown"
+        elif age <= 12:
+            return "0-12 Bulan"
+        elif age <= 24:
+            return "13-24 Bulan"
+        elif age <= 36:
+            return "25-36 Bulan"
+        else:
+            return "37-60 Bulan"
+    except (ValueError, TypeError):
+        return "Unknown"
 
-df_filtered["kelompok_umur"] = df_filtered["umur_balita"].apply(categorize_age)
+# Buat copy untuk menghindari SettingWithCopyWarning
+df_temp = df_filtered.copy()
+df_temp["kelompok_umur"] = df_temp["umur_balita"].apply(categorize_age)
 
-age_df = df_filtered.groupby("kelompok_umur").agg(
+age_df = df_temp.groupby("kelompok_umur").agg(
     total_balita=("is_stunting", "count"),
     total_kasus=("is_stunting", "sum")
 ).reset_index()
+
+# Filter out "Unknown" jika ada
+age_df = age_df[age_df["kelompok_umur"] != "Unknown"]
 
 age_df["prevalensi"] = (age_df["total_kasus"] / age_df["total_balita"] * 100)
 
@@ -292,31 +642,35 @@ age_order = ["0-12 Bulan", "13-24 Bulan", "25-36 Bulan", "37-60 Bulan"]
 age_df["kelompok_umur"] = pd.Categorical(age_df["kelompok_umur"], categories=age_order, ordered=True)
 age_df = age_df.sort_values("kelompok_umur")
 
-fig_age = px.bar(
-    age_df,
-    x="kelompok_umur",
-    y="prevalensi",
-    text=age_df["prevalensi"].round(1).astype(str) + "%",
-    color="prevalensi",
-    color_continuous_scale="Plasma",
-    labels={
-        "kelompok_umur": "Kelompok Umur",
-        "prevalensi": "Prevalensi Stunting (%)"
-    }
-)
+# Cek apakah ada data
+if len(age_df) > 0:
+    fig_age = px.bar(
+        age_df,
+        x="kelompok_umur",
+        y="prevalensi",
+        text=age_df["prevalensi"].round(1).astype(str) + "%",
+        color="prevalensi",
+        color_continuous_scale="Plasma",
+        labels={
+            "kelompok_umur": "Kelompok Umur",
+            "prevalensi": "Prevalensi Stunting (%)"
+        }
+    )
 
-fig_age.update_traces(
-    textposition="outside",
-    textfont_size=14
-)
+    fig_age.update_traces(
+        textposition="outside",
+        textfont_size=14
+    )
 
-fig_age.update_layout(
-    height=400,
-    showlegend=False,
-    yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
-)
+    fig_age.update_layout(
+        height=400,
+        showlegend=False,
+        yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
+    )
 
-st.plotly_chart(fig_age, use_container_width=True)
+    st.plotly_chart(fig_age, use_container_width=True)
+else:
+    st.warning("⚠️ Tidak ada data untuk ditampilkan. Silakan sesuaikan filter.")
 
 st.divider()
 
@@ -402,9 +756,9 @@ with col2:
 st.divider()
 
 # ===============================
-# STATISTIK TAMBAHAN
+# STATISTIK RINGKAS (Sebelum Tabs)
 # ===============================
-st.subheader("📊 Statistik Prevalensi")
+st.subheader("📊 Statistik Prevalensi Keseluruhan")
 
 stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
 
@@ -430,82 +784,6 @@ with stat_col4:
     st.metric(
         "Prevalensi Terendah",
         f"{kec_df['prevalensi'].min():.2f}%"
-    )
-
-st.divider()
-
-# ===============================
-# DIAGNOSTIK Z-SCORE (OPSIONAL)
-# ===============================
-st.subheader("🔬 Diagnostik Z-Score (TB/U vs BB/U)")
-
-# Cek kolom z-score
-zscore_cols = [col for col in df_filtered.columns if 'z' in col.lower() and 'score' in col.lower()]
-
-if len(zscore_cols) >= 2:
-    col_z1, col_z2 = st.columns(2)
-    
-    with col_z1:
-        col_tbu = st.selectbox("📏 Pilih Kolom TB/U", zscore_cols, key="tbu")
-    
-    with col_z2:
-        col_bbu = st.selectbox("⚖️ Pilih Kolom BB/U", zscore_cols, key="bbu", index=min(1, len(zscore_cols)-1))
-    
-    # Bersihkan data dan hilangkan duplikasi kolom
-    df_plot = df_filtered[[col_tbu, col_bbu, "is_stunting"]].copy().dropna()
-    
-    # Pastikan tidak ada duplikasi kolom
-    df_plot = df_plot.loc[:, ~df_plot.columns.duplicated()]
-    
-    if col_tbu != col_bbu:
-        fig_scatter = px.scatter(
-            df_plot,
-            x=col_tbu,
-            y=col_bbu,
-            color="is_stunting",
-            color_discrete_map={0: "green", 1: "red"},
-            labels={
-                col_tbu: "Z-Score TB/U",
-                col_bbu: "Z-Score BB/U",
-                "is_stunting": "Status"
-            }
-        )
-        
-        fig_scatter.add_hline(y=-2, line_dash="dash", line_color="orange")
-        fig_scatter.add_vline(x=-2, line_dash="dash", line_color="orange")
-        
-        fig_scatter.update_layout(
-            height=500,
-            showlegend=True
-        )
-        
-        fig_scatter.for_each_trace(lambda t: t.update(name="Normal" if t.name == "0" else "Stunting"))
-        
-        st.plotly_chart(fig_scatter, use_container_width=True)
-    else:
-        st.warning("⚠️ Pilih kolom yang berbeda untuk TB/U dan BB/U")
-else:
-    st.info("ℹ️ Kolom Z-Score tidak tersedia dalam dataset. Scatter plot tidak dapat ditampilkan.")
-
-# ===============================
-# TABEL DATA LENGKAP
-# ===============================
-with st.expander("📋 Lihat Data Lengkap per Kecamatan"):
-    kec_sorted = kec_df.sort_values("prevalensi", ascending=False).reset_index(drop=True)
-    kec_sorted.insert(0, "Rank", range(1, len(kec_sorted) + 1))
-    
-    display_df = pd.DataFrame({
-        "Rank": kec_sorted["Rank"].apply(lambda x: f"#{x}"),
-        "Kecamatan": kec_sorted["nama_kecamatan"],
-        "Total Balita": kec_sorted["total_balita"],
-        "Kasus Stunting": kec_sorted["total_kasus"],
-        "Prevalensi": kec_sorted["prevalensi"].apply(lambda x: f"{x:.2f}%")
-    })
-    
-    st.dataframe(
-        display_df,
-        use_container_width=True,
-        hide_index=True
     )
 
 # ===============================
