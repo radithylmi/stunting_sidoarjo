@@ -142,7 +142,7 @@ fig_gauge.update_layout(
     paper_bgcolor="white"
 )
 
-st.plotly_chart(fig_gauge, use_container_width=True)
+st.plotly_chart(fig_gauge, use_container_width=True, key="gauge_chart_main")
 
 st.divider()
 
@@ -295,7 +295,7 @@ with tab1:
         }
     )
 
-    st.plotly_chart(fig_map, use_container_width=True)
+    st.plotly_chart(fig_map, use_container_width=True, key="map_chart_tab1")
 
     st.markdown("""
     <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
@@ -343,7 +343,7 @@ with tab2:
                 yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
             )
 
-            st.plotly_chart(fig_age, use_container_width=True)
+            st.plotly_chart(fig_age, use_container_width=True, key="age_chart_tab2")
         
         with col_table:
             st.markdown("#### 📋 Detail Data")
@@ -440,7 +440,7 @@ with tab3:
             yaxis={'categoryorder': 'total ascending'}
         )
         
-        st.plotly_chart(fig_bar, use_container_width=True)
+        st.plotly_chart(fig_bar, use_container_width=True, key="bar_chart_tab3")
     
     with col_cards:
         st.markdown(f"#### 🎯 {top_n}")
@@ -512,8 +512,8 @@ with tab3:
 with tab4:
     st.subheader("🔬 Diagnostik Z-Score (TB/U vs BB/U)")
     
-    # Cek kolom z-score
-    zscore_cols = [col for col in df_filtered.columns if 'z' in col.lower() and 'score' in col.lower()]
+    # Cek kolom z-score - lebih fleksibel
+    zscore_cols = [col for col in df_filtered.columns if ('z' in col.lower() or 'score' in col.lower() or 'tb' in col.lower() or 'bb' in col.lower()) and col != 'is_stunting']
     
     if len(zscore_cols) >= 2:
         col_z1, col_z2 = st.columns(2)
@@ -552,7 +552,7 @@ with tab4:
             
             fig_scatter.for_each_trace(lambda t: t.update(name="Normal" if t.name == "0" else "Stunting"))
             
-            st.plotly_chart(fig_scatter, use_container_width=True)
+            st.plotly_chart(fig_scatter, use_container_width=True, key="scatter_chart_tab4")
             
             # Statistik
             st.markdown("---")
@@ -601,24 +601,181 @@ with tab4:
             else:
                 st.warning("⚠️ Tidak ada data untuk ditampilkan setelah filter diterapkan")
     else:
-        st.info("ℹ️ Kolom Z-Score tidak tersedia dalam dataset. Scatter plot tidak dapat ditampilkan.")
+        st.info("ℹ️ Kolom Z-Score tidak tersedia dalam dataset. Menampilkan analisis alternatif.")
         
+        # Visualisasi 1: Distribusi Status Stunting
+        st.markdown("### 📊 Distribusi Status Stunting")
+        
+        col_pie, col_bar_status = st.columns(2)
+        
+        with col_pie:
+            status_count = df_filtered["is_stunting"].value_counts()
+            
+            fig_pie = px.pie(
+                values=status_count.values,
+                names=["Normal", "Stunting"],
+                color_discrete_sequence=["#10b981", "#ef4444"],
+                hole=0.4,
+                title="Proporsi Stunting vs Normal"
+            )
+            
+            fig_pie.update_traces(
+                textposition='inside', 
+                textinfo='percent+label',
+                textfont_size=14
+            )
+            fig_pie.update_layout(height=400)
+            
+            st.plotly_chart(fig_pie, use_container_width=True, key="pie_chart_tab4")
+        
+        with col_bar_status:
+            status_df = pd.DataFrame({
+                'Status': ['Normal', 'Stunting'],
+                'Jumlah': [status_count.get(0, 0), status_count.get(1, 0)]
+            })
+            
+            fig_bar_status = px.bar(
+                status_df,
+                x='Status',
+                y='Jumlah',
+                text='Jumlah',
+                color='Status',
+                color_discrete_map={'Normal': '#10b981', 'Stunting': '#ef4444'},
+                title="Jumlah Balita per Status"
+            )
+            
+            fig_bar_status.update_traces(textposition='outside')
+            fig_bar_status.update_layout(height=400, showlegend=False)
+            
+            st.plotly_chart(fig_bar_status, use_container_width=True, key="bar_status_tab4")
+        
+        # Visualisasi 2: Stunting per Kecamatan (Top 10)
         st.markdown("---")
-        st.subheader("📊 Alternatif: Distribusi Status Stunting")
+        st.markdown("### 🗺️ Top 10 Kecamatan dengan Kasus Stunting Tertinggi")
         
-        status_count = df_filtered["is_stunting"].value_counts()
+        kec_stunting = df_filtered.groupby("nama_kecamatan").agg(
+            total=("is_stunting", "count"),
+            stunting=("is_stunting", "sum")
+        ).reset_index()
         
-        fig_pie = px.pie(
-            values=status_count.values,
-            names=["Normal", "Stunting"],
-            color_discrete_sequence=["green", "red"],
-            hole=0.4
+        kec_stunting["persen"] = (kec_stunting["stunting"] / kec_stunting["total"] * 100).round(2)
+        top10_stunting = kec_stunting.sort_values("stunting", ascending=False).head(10)
+        
+        fig_kec = px.bar(
+            top10_stunting,
+            x="stunting",
+            y="nama_kecamatan",
+            orientation="h",
+            text=top10_stunting.apply(lambda x: f"{int(x['stunting'])} ({x['persen']:.1f}%)", axis=1),
+            color="persen",
+            color_continuous_scale="Reds",
+            labels={"stunting": "Jumlah Kasus", "nama_kecamatan": "Kecamatan", "persen": "Prevalensi (%)"}
         )
         
-        fig_pie.update_traces(textposition='inside', textinfo='percent+label')
-        fig_pie.update_layout(height=500)
+        fig_kec.update_traces(textposition="outside")
+        fig_kec.update_layout(
+            height=500,
+            yaxis={'categoryorder': 'total ascending'}
+        )
         
-        st.plotly_chart(fig_pie, use_container_width=True)
+        st.plotly_chart(fig_kec, use_container_width=True, key="kec_stunting_tab4")
+        
+        # Visualisasi 3: Stunting per Kelompok Umur
+        st.markdown("---")
+        st.markdown("### 👶 Distribusi Stunting per Kelompok Umur")
+        
+        if len(age_df) > 0:
+            col_age1, col_age2 = st.columns(2)
+            
+            with col_age1:
+                fig_age_stunting = px.bar(
+                    age_df,
+                    x="kelompok_umur",
+                    y="total_kasus",
+                    text="total_kasus",
+                    color="prevalensi",
+                    color_continuous_scale="Oranges",
+                    labels={"total_kasus": "Jumlah Kasus", "kelompok_umur": "Kelompok Umur"},
+                    title="Jumlah Kasus per Kelompok Umur"
+                )
+                
+                fig_age_stunting.update_traces(textposition="outside")
+                fig_age_stunting.update_layout(height=400)
+                
+                st.plotly_chart(fig_age_stunting, use_container_width=True, key="age_kasus_tab4")
+            
+            with col_age2:
+                fig_age_prev = px.line(
+                    age_df,
+                    x="kelompok_umur",
+                    y="prevalensi",
+                    markers=True,
+                    text=age_df["prevalensi"].round(1).astype(str) + "%",
+                    title="Tren Prevalensi per Kelompok Umur"
+                )
+                
+                fig_age_prev.update_traces(
+                    textposition="top center",
+                    line=dict(color='#f97316', width=3),
+                    marker=dict(size=12)
+                )
+                fig_age_prev.update_layout(
+                    height=400,
+                    yaxis_title="Prevalensi (%)"
+                )
+                
+                st.plotly_chart(fig_age_prev, use_container_width=True, key="age_prev_tab4")
+        
+        # Statistik Ringkas
+        st.markdown("---")
+        st.markdown("### 📈 Statistik Ringkas")
+        
+        stat1, stat2, stat3, stat4 = st.columns(4)
+        
+        with stat1:
+            st.metric(
+                "Total Balita Diperiksa",
+                f"{len(df_filtered):,}",
+                help="Jumlah total balita yang telah diskrining"
+            )
+        
+        with stat2:
+            total_stunting = int(df_filtered["is_stunting"].sum())
+            st.metric(
+                "Total Kasus Stunting",
+                f"{total_stunting:,}",
+                delta=f"{(total_stunting/len(df_filtered)*100):.1f}%",
+                delta_color="inverse",
+                help="Jumlah balita dengan status stunting"
+            )
+        
+        with stat3:
+            if len(age_df) > 0:
+                max_age = age_df.loc[age_df["prevalensi"].idxmax(), "kelompok_umur"]
+                max_prev = age_df["prevalensi"].max()
+                st.metric(
+                    "Kelompok Tertinggi",
+                    max_age,
+                    delta=f"{max_prev:.1f}%",
+                    delta_color="inverse",
+                    help="Kelompok umur dengan prevalensi tertinggi"
+                )
+            else:
+                st.metric("Kelompok Tertinggi", "N/A")
+        
+        with stat4:
+            if len(kec_df) > 0:
+                max_kec = kec_df.loc[kec_df["prevalensi"].idxmax(), "nama_kecamatan"]
+                max_kec_prev = kec_df["prevalensi"].max()
+                st.metric(
+                    "Kecamatan Tertinggi",
+                    max_kec,
+                    delta=f"{max_kec_prev:.1f}%",
+                    delta_color="inverse",
+                    help="Kecamatan dengan prevalensi tertinggi"
+                )
+            else:
+                st.metric("Kecamatan Tertinggi", "N/A")
 
 # ===============================
 # TAB 5: DATA LENGKAP
@@ -689,7 +846,7 @@ with col1:
         yaxis={'categoryorder': 'total ascending'}
     )
     
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, use_container_width=True, key="bar_chart_bottom")
 
 with col2:
     st.subheader("🏆 Top 5 Kecamatan")
