@@ -3,6 +3,7 @@ import pandas as pd
 import numpy as np
 import json
 import plotly.express as px
+import plotly.graph_objects as go
 
 st.set_page_config(
     page_title="Dashboard Stunting Kabupaten Sidoarjo",
@@ -15,32 +16,26 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     df = pd.read_csv("data_skrinning_stunting(1).csv")
-
     df.columns = (
         df.columns
         .str.lower()
         .str.replace(" ", "_")
         .str.replace(".", "", regex=False)
     )
-
-    # Normalisasi nama kecamatan (INI KUNCI MAP MUNCUL)
+    # Normalisasi nama kecamatan
     df["nama_kecamatan"] = (
         df["nama_kecamatan"]
         .astype(str)
         .str.upper()
         .str.strip()
     )
-
     df["is_stunting"] = df["stunting_balita"].map({"Ya": 1, "Tidak": 0})
-
     return df
-
 
 @st.cache_data
 def load_geojson():
     with open("kecamatan_sidoarjo.geojson", "r", encoding="utf-8") as f:
         geojson = json.load(f)
-
     # Normalisasi NAMOBJ
     for feat in geojson["features"]:
         feat["properties"]["NAMOBJ"] = (
@@ -48,9 +43,7 @@ def load_geojson():
             .upper()
             .strip()
         )
-
     return geojson
-
 
 df = load_data()
 geojson = load_geojson()
@@ -67,97 +60,215 @@ umur_pilih = st.sidebar.multiselect(
     umur_opsi,
     default=umur_opsi
 )
-
-df = df[df["umur_balita"].isin(umur_pilih)]
+df_filtered = df[df["umur_balita"].isin(umur_pilih)]
 
 # ===============================
 # KPI
 # ===============================
-total_balita = len(df)
-total_kasus = int(df["is_stunting"].sum())
+total_balita = len(df_filtered)
+total_kasus = int(df_filtered["is_stunting"].sum())
 prevalensi = (total_kasus / total_balita * 100) if total_balita > 0 else 0
 
 st.title("📊 Dashboard Stunting Kabupaten Sidoarjo")
-
 c1, c2, c3 = st.columns(3)
-c1.metric("👶 Total Balita", total_balita)
-c2.metric("🚨 Kasus Stunting", total_kasus)
+c1.metric("👶 Total Balita", f"{total_balita:,}")
+c2.metric("🚨 Kasus Stunting", f"{total_kasus:,}")
 c3.metric("📉 Prevalensi", f"{prevalensi:.2f}%")
-
 st.divider()
 
 # ===============================
 # AGREGASI KECAMATAN
 # ===============================
 kec_df = (
-    df.groupby("nama_kecamatan")
+    df_filtered.groupby("nama_kecamatan")
     .agg(
         total_balita=("is_stunting", "count"),
         total_kasus=("is_stunting", "sum")
     )
     .reset_index()
 )
-
 kec_df["prevalensi"] = (
     kec_df["total_kasus"] / kec_df["total_balita"] * 100
 )
 
 # ===============================
-# MAP (PASTI MUNCUL)
+# MAP MENGGUNAKAN CHOROPLETH_MAPBOX (LEBIH BAGUS!)
 # ===============================
 st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
 
-fig_map = px.choropleth(
+# Buat peta dengan mapbox (lebih bagus dari choropleth biasa)
+fig_map = px.choropleth_mapbox(
     kec_df,
     geojson=geojson,
     locations="nama_kecamatan",
     featureidkey="properties.NAMOBJ",
     color="prevalensi",
     color_continuous_scale="Reds",
-    range_color=(0, kec_df["prevalensi"].max() if len(kec_df) > 0 else 1),
+    range_color=(0, kec_df["prevalensi"].max() if len(kec_df) > 0 else 100),
+    mapbox_style="carto-positron",
+    center={"lat": -7.45, "lon": 112.71},  # Koordinat Sidoarjo
+    zoom=10,
+    opacity=0.7,
     hover_name="nama_kecamatan",
     hover_data={
-        "total_balita": True,
-        "total_kasus": True,
+        "nama_kecamatan": False,
+        "total_balita": ":,",
+        "total_kasus": ":,",
         "prevalensi": ":.2f"
+    },
+    labels={
+        "prevalensi": "Prevalensi (%)",
+        "total_balita": "Total Balita",
+        "total_kasus": "Kasus Stunting"
     }
 )
 
-fig_map.update_geos(
-    fitbounds="locations",
-    visible=False
-)
-
 fig_map.update_layout(
-    margin={"r":0,"t":0,"l":0,"b":0}
+    margin={"r": 0, "t": 0, "l": 0, "b": 0},
+    height=600,
+    coloraxis_colorbar={
+        "title": "Prevalensi<br>Stunting (%)",
+        "thickness": 15,
+        "len": 0.7,
+        "x": 1.02
+    }
 )
 
 st.plotly_chart(fig_map, use_container_width=True)
 
 # ===============================
-# BAR CHART KECAMATAN
+# LAYOUT 2 KOLOM: BAR CHART & TOP 5
 # ===============================
-st.subheader("📍 Top Kecamatan dengan Prevalensi Tertinggi")
+col1, col2 = st.columns([2, 1])
 
-fig_bar = px.bar(
-    kec_df.sort_values("prevalensi", ascending=False).head(10),
-    x="prevalensi",
-    y="nama_kecamatan",
-    orientation="h",
-    text=kec_df.sort_values("prevalensi", ascending=False)
-        .head(10)["prevalensi"].round(2).astype(str) + "%"
-)
+with col1:
+    st.subheader("📍 Top 10 Kecamatan dengan Prevalensi Tertinggi")
+    
+    top10 = kec_df.sort_values("prevalensi", ascending=False).head(10)
+    
+    fig_bar = px.bar(
+        top10,
+        x="prevalensi",
+        y="nama_kecamatan",
+        orientation="h",
+        text=top10["prevalensi"].round(2).astype(str) + "%",
+        color="prevalensi",
+        color_continuous_scale="Reds"
+    )
+    
+    fig_bar.update_traces(
+        textposition="outside",
+        textfont_size=12
+    )
+    
+    fig_bar.update_layout(
+        xaxis_title="Prevalensi (%)",
+        yaxis_title="",
+        showlegend=False,
+        height=500,
+        yaxis={'categoryorder': 'total ascending'}
+    )
+    
+    st.plotly_chart(fig_bar, use_container_width=True)
 
-fig_bar.update_layout(
-    xaxis_title="Prevalensi (%)",
-    yaxis_title="Kecamatan"
-)
+with col2:
+    st.subheader("🏆 Top 5 Kecamatan")
+    
+    top5 = kec_df.sort_values("prevalensi", ascending=False).head(5)
+    
+    for i, (idx, row) in enumerate(top5.iterrows(), 1):
+        # Tentukan warna berdasarkan ranking
+        if i == 1:
+            border_color = "#dc2626"  # Merah tua
+            bg_color = "#fee2e2"
+        elif i == 2:
+            border_color = "#ea580c"  # Orange
+            bg_color = "#ffedd5"
+        elif i == 3:
+            border_color = "#f59e0b"  # Kuning
+            bg_color = "#fef3c7"
+        else:
+            border_color = "#f97316"
+            bg_color = "#fff7ed"
+        
+        st.markdown(f"""
+        <div style="
+            background-color: {bg_color};
+            padding: 15px;
+            border-radius: 10px;
+            margin-bottom: 12px;
+            border-left: 5px solid {border_color};
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        ">
+            <div style="display: flex; align-items: center; justify-content: space-between;">
+                <div style="flex: 1;">
+                    <div style="font-size: 14px; color: #666; font-weight: 600;">
+                        #{i} {row['nama_kecamatan']}
+                    </div>
+                    <div style="font-size: 32px; color: {border_color}; font-weight: bold; margin: 8px 0;">
+                        {row['prevalensi']:.2f}%
+                    </div>
+                    <div style="font-size: 13px; color: #666;">
+                        {row['total_kasus']:,} dari {row['total_balita']:,} balita
+                    </div>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.plotly_chart(fig_bar, use_container_width=True)
+st.divider()
 
 # ===============================
-# DEBUG (AMAN DIHAPUS NANTI)
+# STATISTIK TAMBAHAN
+# ===============================
+st.subheader("📊 Statistik Prevalensi")
+
+stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
+
+with stat_col1:
+    st.metric(
+        "Rata-rata Prevalensi",
+        f"{kec_df['prevalensi'].mean():.2f}%"
+    )
+
+with stat_col2:
+    st.metric(
+        "Median Prevalensi",
+        f"{kec_df['prevalensi'].median():.2f}%"
+    )
+
+with stat_col3:
+    st.metric(
+        "Prevalensi Tertinggi",
+        f"{kec_df['prevalensi'].max():.2f}%"
+    )
+
+with stat_col4:
+    st.metric(
+        "Prevalensi Terendah",
+        f"{kec_df['prevalensi'].min():.2f}%"
+    )
+
+# ===============================
+# TABEL DATA
+# ===============================
+with st.expander("📋 Lihat Data Lengkap per Kecamatan"):
+    st.dataframe(
+        kec_df.sort_values("prevalensi", ascending=False)
+        .style.format({
+            "prevalensi": "{:.2f}%",
+            "total_balita": "{:,}",
+            "total_kasus": "{:,}"
+        })
+        .background_gradient(subset=["prevalensi"], cmap="Reds"),
+        use_container_width=True
+    )
+
+# ===============================
+# DEBUG
 # ===============================
 with st.expander("🧪 Debug Data"):
-    st.write("Jumlah baris:", len(df))
-    st.dataframe(kec_df.head())
+    st.write("**Jumlah baris data:**", len(df_filtered))
+    st.write("**Jumlah kecamatan:**", len(kec_df))
+    st.write("**Preview data agregasi:**")
+    st.dataframe(kec_df.head(10))
