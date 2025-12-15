@@ -147,6 +147,52 @@ st.plotly_chart(fig_gauge, use_container_width=True)
 st.divider()
 
 # ===============================
+# AGREGASI DATA (SEBELUM TAB!)
+# ===============================
+
+# AGREGASI PER KECAMATAN
+kec_df = df_filtered.groupby("nama_kecamatan").agg(
+    total_balita=("is_stunting", "count"),
+    total_kasus=("is_stunting", "sum")
+).reset_index()
+
+kec_df["prevalensi"] = (kec_df["total_kasus"] / kec_df["total_balita"] * 100)
+
+# AGREGASI PER KELOMPOK UMUR
+def categorize_age(age):
+    try:
+        age = float(age)
+        if pd.isna(age):
+            return "Unknown"
+        elif age <= 12:
+            return "0-12 Bulan"
+        elif age <= 24:
+            return "13-24 Bulan"
+        elif age <= 36:
+            return "25-36 Bulan"
+        else:
+            return "37-60 Bulan"
+    except (ValueError, TypeError):
+        return "Unknown"
+
+df_temp = df_filtered.copy()
+df_temp["kelompok_umur"] = df_temp["umur_balita"].apply(categorize_age)
+
+age_df = df_temp.groupby("kelompok_umur").agg(
+    total_balita=("is_stunting", "count"),
+    total_kasus=("is_stunting", "sum")
+).reset_index()
+
+# Filter out "Unknown" jika ada
+age_df = age_df[age_df["kelompok_umur"] != "Unknown"]
+
+age_df["prevalensi"] = (age_df["total_kasus"] / age_df["total_balita"] * 100)
+
+age_order = ["0-12 Bulan", "13-24 Bulan", "25-36 Bulan", "37-60 Bulan"]
+age_df["kelompok_umur"] = pd.Categorical(age_df["kelompok_umur"], categories=age_order, ordered=True)
+age_df = age_df.sort_values("kelompok_umur")
+
+# ===============================
 # TAB NAVIGATION UNTUK BERBAGAI VISUALISASI
 # ===============================
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
@@ -608,70 +654,6 @@ with tab5:
         mime="text/csv"
     )
 
-def categorize_age(age):
-    try:
-        age = float(age)
-        if pd.isna(age):
-            return "Unknown"
-        elif age <= 12:
-            return "0-12 Bulan"
-        elif age <= 24:
-            return "13-24 Bulan"
-        elif age <= 36:
-            return "25-36 Bulan"
-        else:
-            return "37-60 Bulan"
-    except (ValueError, TypeError):
-        return "Unknown"
-
-# Buat copy untuk menghindari SettingWithCopyWarning
-df_temp = df_filtered.copy()
-df_temp["kelompok_umur"] = df_temp["umur_balita"].apply(categorize_age)
-
-age_df = df_temp.groupby("kelompok_umur").agg(
-    total_balita=("is_stunting", "count"),
-    total_kasus=("is_stunting", "sum")
-).reset_index()
-
-# Filter out "Unknown" jika ada
-age_df = age_df[age_df["kelompok_umur"] != "Unknown"]
-
-age_df["prevalensi"] = (age_df["total_kasus"] / age_df["total_balita"] * 100)
-
-age_order = ["0-12 Bulan", "13-24 Bulan", "25-36 Bulan", "37-60 Bulan"]
-age_df["kelompok_umur"] = pd.Categorical(age_df["kelompok_umur"], categories=age_order, ordered=True)
-age_df = age_df.sort_values("kelompok_umur")
-
-# Cek apakah ada data
-if len(age_df) > 0:
-    fig_age = px.bar(
-        age_df,
-        x="kelompok_umur",
-        y="prevalensi",
-        text=age_df["prevalensi"].round(1).astype(str) + "%",
-        color="prevalensi",
-        color_continuous_scale="Plasma",
-        labels={
-            "kelompok_umur": "Kelompok Umur",
-            "prevalensi": "Prevalensi Stunting (%)"
-        }
-    )
-
-    fig_age.update_traces(
-        textposition="outside",
-        textfont_size=14
-    )
-
-    fig_age.update_layout(
-        height=400,
-        showlegend=False,
-        yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
-    )
-
-    st.plotly_chart(fig_age, use_container_width=True)
-else:
-    st.warning("⚠️ Tidak ada data untuk ditampilkan. Silakan sesuaikan filter.")
-
 st.divider()
 
 # ===============================
@@ -756,7 +738,7 @@ with col2:
 st.divider()
 
 # ===============================
-# STATISTIK RINGKAS (Sebelum Tabs)
+# STATISTIK RINGKAS
 # ===============================
 st.subheader("📊 Statistik Prevalensi Keseluruhan")
 
@@ -793,5 +775,7 @@ with st.expander("🧪 Debug Data"):
     st.write("**Jumlah baris data:**", len(df_filtered))
     st.write("**Jumlah kecamatan:**", len(kec_df))
     st.write("**Kolom tersedia:**", df.columns.tolist())
-    st.write("**Preview data agregasi:**")
+    st.write("**Preview data agregasi kecamatan:**")
     st.dataframe(kec_df.head(10))
+    st.write("**Preview data agregasi umur:**")
+    st.dataframe(age_df)
