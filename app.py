@@ -4,11 +4,153 @@ import numpy as np
 import json
 import plotly.express as px
 import plotly.graph_objects as go
+from plotly.subplots import make_subplots
 
 st.set_page_config(
     page_title="Dashboard Stunting Kabupaten Sidoarjo",
-    layout="wide"
+    layout="wide",
+    initial_sidebar_state="expanded",
+    page_icon="📊"
 )
+
+# ===============================
+# CUSTOM CSS - MODERN & ELEGANT
+# ===============================
+st.markdown("""
+<style>
+    /* Main Background */
+    .main {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        background-attachment: fixed;
+    }
+    
+    /* Container dengan glassmorphism */
+    .block-container {
+        background: rgba(255, 255, 255, 0.95);
+        backdrop-filter: blur(10px);
+        border-radius: 20px;
+        padding: 2rem;
+        box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+    }
+    
+    /* Header styling */
+    h1 {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        font-weight: 800;
+        font-size: 3rem !important;
+        text-align: center;
+        margin-bottom: 1rem;
+        text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+    }
+    
+    h2, h3 {
+        color: #667eea;
+        font-weight: 700;
+    }
+    
+    /* Metric cards enhancement */
+    [data-testid="stMetricValue"] {
+        font-size: 2.5rem;
+        font-weight: 700;
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+    }
+    
+    [data-testid="stMetricLabel"] {
+        font-weight: 600;
+        font-size: 1.1rem;
+        color: #4a5568;
+    }
+    
+    /* Sidebar styling */
+    [data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #667eea 0%, #764ba2 100%);
+    }
+    
+    [data-testid="stSidebar"] .element-container {
+        color: white;
+    }
+    
+    /* Button styling */
+    .stButton>button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border-radius: 10px;
+        border: none;
+        padding: 0.5rem 2rem;
+        font-weight: 600;
+        transition: all 0.3s ease;
+        box-shadow: 0 4px 15px 0 rgba(102, 126, 234, 0.4);
+    }
+    
+    .stButton>button:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 6px 20px 0 rgba(102, 126, 234, 0.6);
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        gap: 8px;
+        background-color: rgba(102, 126, 234, 0.1);
+        border-radius: 10px;
+        padding: 8px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        border-radius: 8px;
+        padding: 10px 20px;
+        font-weight: 600;
+        background-color: white;
+        border: 2px solid transparent;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        color: white;
+        border: 2px solid white;
+    }
+    
+    /* Divider */
+    hr {
+        margin: 2rem 0;
+        border: none;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, #667eea, transparent);
+    }
+    
+    /* Expander */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+        border-radius: 10px;
+        font-weight: 600;
+    }
+    
+    /* Info boxes */
+    .stAlert {
+        border-radius: 10px;
+        border-left: 4px solid #667eea;
+    }
+    
+    /* Dataframe */
+    .dataframe {
+        border-radius: 10px;
+        overflow: hidden;
+    }
+    
+    /* Animation */
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    .element-container {
+        animation: fadeIn 0.5s ease-out;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 # ===============================
 # LOAD DATA
@@ -22,7 +164,6 @@ def load_data():
         .str.replace(" ", "_")
         .str.replace(".", "", regex=False)
     )
-    # Normalisasi nama kecamatan
     df["nama_kecamatan"] = (
         df["nama_kecamatan"]
         .astype(str)
@@ -36,7 +177,6 @@ def load_data():
 def load_geojson():
     with open("kecamatan_sidoarjo.geojson", "r", encoding="utf-8") as f:
         geojson = json.load(f)
-    # Normalisasi NAMOBJ
     for feat in geojson["features"]:
         feat["properties"]["NAMOBJ"] = (
             feat["properties"]["NAMOBJ"]
@@ -49,116 +189,297 @@ df = load_data()
 geojson = load_geojson()
 
 # ===============================
-# SIDEBAR FILTER
+# SIDEBAR - MODERN FILTER
 # ===============================
-st.sidebar.header("🔎 Filter Data")
-
-# FILTER KECAMATAN
-kecamatan_opsi = sorted(df["nama_kecamatan"].unique())
-kecamatan_pilih = st.sidebar.multiselect(
-    "📍 Pilih Kecamatan",
-    kecamatan_opsi,
-    default=kecamatan_opsi
-)
-
-# FILTER UMUR
-umur_opsi = sorted(df["umur_balita"].dropna().unique())
-umur_pilih = st.sidebar.multiselect(
-    "👶 Pilih Umur Balita",
-    umur_opsi,
-    default=umur_opsi
-)
-
-# Terapkan filter
-df_filtered = df[
-    (df["nama_kecamatan"].isin(kecamatan_pilih)) &
-    (df["umur_balita"].isin(umur_pilih))
-]
-
-# Info jumlah data terfilter
-st.sidebar.markdown("---")
-st.sidebar.info(f"📊 **{len(df_filtered):,}** data balita terfilter dari **{len(df):,}** total data")
+with st.sidebar:
+    st.markdown("""
+    <div style='text-align: center; padding: 1rem 0;'>
+        <h2 style='color: white; margin: 0;'>🔍 Filter Data</h2>
+        <p style='color: rgba(255,255,255,0.8); margin: 0.5rem 0;'>Sesuaikan visualisasi data</p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    st.markdown("<hr style='border-color: rgba(255,255,255,0.3); margin: 1rem 0;'>", unsafe_allow_html=True)
+    
+    # Filter Kecamatan dengan search
+    kecamatan_opsi = sorted(df["nama_kecamatan"].unique())
+    kecamatan_pilih = st.multiselect(
+        "📍 Pilih Kecamatan",
+        kecamatan_opsi,
+        default=kecamatan_opsi,
+        help="Pilih satu atau lebih kecamatan untuk analisis"
+    )
+    
+    # Filter Umur dengan range slider jika memungkinkan
+    umur_opsi = sorted(df["umur_balita"].dropna().unique())
+    
+    if len(umur_opsi) > 0:
+        umur_min = int(min(umur_opsi))
+        umur_max = int(max(umur_opsi))
+        
+        if umur_max > umur_min:
+            umur_range = st.slider(
+                "👶 Rentang Umur Balita (bulan)",
+                min_value=umur_min,
+                max_value=umur_max,
+                value=(umur_min, umur_max),
+                help="Geser untuk memilih rentang umur"
+            )
+            umur_pilih = [u for u in umur_opsi if umur_range[0] <= u <= umur_range[1]]
+        else:
+            umur_pilih = umur_opsi
+    else:
+        umur_pilih = []
+    
+    # Filter Jenis Kelamin jika ada
+    if 'jenis_kelamin_balita' in df.columns:
+        jk_options = df['jenis_kelamin_balita'].dropna().unique().tolist()
+        if len(jk_options) > 0:
+            jk_pilih = st.multiselect(
+                "⚧️ Jenis Kelamin",
+                jk_options,
+                default=jk_options,
+                help="Filter berdasarkan jenis kelamin"
+            )
+        else:
+            jk_pilih = None
+    else:
+        jk_pilih = None
+    
+    # Apply filters
+    df_filtered = df[
+        (df["nama_kecamatan"].isin(kecamatan_pilih)) &
+        (df["umur_balita"].isin(umur_pilih))
+    ]
+    
+    if jk_pilih and 'jenis_kelamin_balita' in df.columns:
+        df_filtered = df_filtered[df_filtered['jenis_kelamin_balita'].isin(jk_pilih)]
+    
+    # Info box
+    st.markdown("<hr style='border-color: rgba(255,255,255,0.3); margin: 1.5rem 0;'>", unsafe_allow_html=True)
+    
+    st.markdown(f"""
+    <div style='background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 10px; color: white;'>
+        <div style='text-align: center;'>
+            <p style='margin: 0; font-size: 0.9rem; opacity: 0.9;'>📊 Data Terfilter</p>
+            <h2 style='margin: 0.5rem 0; color: white;'>{len(df_filtered):,}</h2>
+            <p style='margin: 0; font-size: 0.85rem; opacity: 0.8;'>dari {len(df):,} total data</p>
+            <div style='margin-top: 0.5rem; padding-top: 0.5rem; border-top: 1px solid rgba(255,255,255,0.3);'>
+                <p style='margin: 0; font-size: 0.8rem;'>{len(df_filtered)/len(df)*100:.1f}% data dipilih</p>
+            </div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Quick Stats
+    if len(df_filtered) > 0:
+        quick_prev = (df_filtered["is_stunting"].sum() / len(df_filtered) * 100)
+        st.markdown(f"""
+        <div style='background: rgba(255,255,255,0.15); padding: 0.8rem; border-radius: 8px; margin-top: 1rem; color: white;'>
+            <p style='margin: 0; font-size: 0.85rem; opacity: 0.9;'>⚡ Prevalensi</p>
+            <h3 style='margin: 0.3rem 0; color: white;'>{quick_prev:.2f}%</h3>
+        </div>
+        """, unsafe_allow_html=True)
 
 # ===============================
-# MAIN TITLE
+# HEADER dengan Animasi
 # ===============================
-st.title("📊 Dashboard Stunting Kabupaten Sidoarjo")
+st.markdown("""
+<div style='text-align: center; margin-bottom: 2rem;'>
+    <h1>📊 Dashboard Analisis Stunting</h1>
+    <p style='font-size: 1.3rem; color: #667eea; font-weight: 600;'>Kabupaten Sidoarjo</p>
+    <p style='color: #718096; font-size: 1rem;'>Monitoring & Evaluasi Kesehatan Balita</p>
+</div>
+""", unsafe_allow_html=True)
 
 # ===============================
-# KPI CARDS
+# KPI CARDS - MODERN DESIGN
 # ===============================
 total_balita = len(df_filtered)
 total_kasus = int(df_filtered["is_stunting"].sum())
 prevalensi = (total_kasus / total_balita * 100) if total_balita > 0 else 0
 
-c1, c2, c3 = st.columns(3)
-c1.metric("👶 Total Balita", f"{total_balita:,}")
-c2.metric("🚨 Kasus Stunting", f"{total_kasus:,}")
-c3.metric("📉 Prevalensi", f"{prevalensi:.2f}%")
+col1, col2, col3, col4 = st.columns(4)
 
-st.divider()
+with col1:
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                padding: 1.5rem; border-radius: 15px; color: white; 
+                box-shadow: 0 8px 20px rgba(102, 126, 234, 0.4);'>
+        <p style='margin: 0; font-size: 0.9rem; opacity: 0.9;'>👶 Total Balita</p>
+        <h2 style='margin: 0.5rem 0; color: white; font-size: 2.5rem;'>{:,}</h2>
+        <p style='margin: 0; font-size: 0.85rem; opacity: 0.8;'>Diperiksa</p>
+    </div>
+    """.format(total_balita), unsafe_allow_html=True)
+
+with col2:
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); 
+                padding: 1.5rem; border-radius: 15px; color: white;
+                box-shadow: 0 8px 20px rgba(245, 87, 108, 0.4);'>
+        <p style='margin: 0; font-size: 0.9rem; opacity: 0.9;'>🚨 Kasus Stunting</p>
+        <h2 style='margin: 0.5rem 0; color: white; font-size: 2.5rem;'>{:,}</h2>
+        <p style='margin: 0; font-size: 0.85rem; opacity: 0.8;'>Balita</p>
+    </div>
+    """.format(total_kasus), unsafe_allow_html=True)
+
+with col3:
+    prev_color = "#f5576c" if prevalensi >= 30 else "#feca57" if prevalensi >= 20 else "#48dbfb"
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); 
+                padding: 1.5rem; border-radius: 15px; color: white;
+                box-shadow: 0 8px 20px rgba(79, 172, 254, 0.4);'>
+        <p style='margin: 0; font-size: 0.9rem; opacity: 0.9;'>📉 Prevalensi</p>
+        <h2 style='margin: 0.5rem 0; color: white; font-size: 2.5rem;'>{:.2f}%</h2>
+        <p style='margin: 0; font-size: 0.85rem; opacity: 0.8;'>Rata-rata</p>
+    </div>
+    """.format(prevalensi), unsafe_allow_html=True)
+
+with col4:
+    normal_count = total_balita - total_kasus
+    st.markdown("""
+    <div style='background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); 
+                padding: 1.5rem; border-radius: 15px; color: white;
+                box-shadow: 0 8px 20px rgba(67, 233, 123, 0.4);'>
+        <p style='margin: 0; font-size: 0.9rem; opacity: 0.9;'>✅ Normal</p>
+        <h2 style='margin: 0.5rem 0; color: white; font-size: 2.5rem;'>{:,}</h2>
+        <p style='margin: 0; font-size: 0.85rem; opacity: 0.8;'>Balita Sehat</p>
+    </div>
+    """.format(normal_count), unsafe_allow_html=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ===============================
-# GAUGE CHART - KPI PREVALENSI
+# GAUGE CHART - INTERACTIVE
 # ===============================
-st.subheader("🎯 KPI Prevalensi Stunting")
+col_gauge, col_insight = st.columns([2, 1])
 
-fig_gauge = go.Figure(go.Indicator(
-    mode="gauge+number+delta",
-    value=prevalensi,
-    domain={'x': [0, 1], 'y': [0, 1]},
-    title={'text': "Prevalensi Stunting", 'font': {'size': 20}},
-    number={'suffix': "%", 'font': {'size': 40}},
-    delta={
-        'reference': 30,
-        'increasing': {'color': "red"},
-        'decreasing': {'color': "green"}
-    },
-    gauge={
-        'axis': {'range': [None, 100], 'tickwidth': 1, 'tickcolor': "darkblue"},
-        'bar': {'color': "darkblue"},
-        'bgcolor': "white",
-        'borderwidth': 2,
-        'bordercolor': "gray",
-        'steps': [
-            {'range': [0, 10], 'color': '#1a9850'},
-            {'range': [10, 20], 'color': '#91cf60'},
-            {'range': [20, 30], 'color': '#d9ef8b'},
-            {'range': [30, 40], 'color': '#fee08b'},
-            {'range': [40, 60], 'color': '#fc8d59'},
-            {'range': [60, 100], 'color': '#d73027'}
-        ],
-        'threshold': {
-            'line': {'color': "red", 'width': 4},
-            'thickness': 0.75,
-            'value': 30
+with col_gauge:
+    st.markdown("### 🎯 Indikator Prevalensi Stunting")
+    
+    fig_gauge = go.Figure(go.Indicator(
+        mode="gauge+number+delta",
+        value=prevalensi,
+        domain={'x': [0, 1], 'y': [0, 1]},
+        title={'text': "Prevalensi Stunting (%)", 'font': {'size': 22, 'color': '#667eea'}},
+        number={'suffix': "%", 'font': {'size': 50, 'color': '#667eea'}},
+        delta={
+            'reference': 30,
+            'increasing': {'color': "#f5576c"},
+            'decreasing': {'color': "#43e97b"}
+        },
+        gauge={
+            'axis': {'range': [None, 100], 'tickwidth': 2, 'tickcolor': "#667eea"},
+            'bar': {'color': "#667eea", 'thickness': 0.8},
+            'bgcolor': "white",
+            'borderwidth': 3,
+            'bordercolor': "#e2e8f0",
+            'steps': [
+                {'range': [0, 10], 'color': '#d4f1d4'},
+                {'range': [10, 20], 'color': '#b3e5b3'},
+                {'range': [20, 30], 'color': '#ffeaa7'},
+                {'range': [30, 40], 'color': '#feca57'},
+                {'range': [40, 60], 'color': '#ff7675'},
+                {'range': [60, 100], 'color': '#d63031'}
+            ],
+            'threshold': {
+                'line': {'color': "#f5576c", 'width': 5},
+                'thickness': 0.85,
+                'value': 30
+            }
         }
-    }
-))
+    ))
+    
+    fig_gauge.update_layout(
+        height=400,
+        margin=dict(l=20, r=20, t=80, b=20),
+        paper_bgcolor="rgba(0,0,0,0)",
+        font={'family': "Arial, sans-serif"}
+    )
+    
+    st.plotly_chart(fig_gauge, use_container_width=True)
 
-fig_gauge.update_layout(
-    height=350,
-    margin=dict(l=20, r=20, t=60, b=20),
-    paper_bgcolor="white"
-)
+with col_insight:
+    st.markdown("### 💡 Status & Rekomendasi")
+    
+    if prevalensi < 10:
+        status_color = "#43e97b"
+        status_emoji = "🟢"
+        status_text = "Sangat Baik"
+        rekomendasi = "Pertahankan program pencegahan yang ada dan terus lakukan monitoring berkala."
+    elif prevalensi < 20:
+        status_color = "#feca57"
+        status_emoji = "🟡"
+        status_text = "Baik"
+        rekomendasi = "Tingkatkan program edukasi gizi dan pemantauan pertumbuhan balita."
+    elif prevalensi < 30:
+        status_color = "#ff7675"
+        status_emoji = "🟠"
+        status_text = "Perlu Perhatian"
+        rekomendasi = "Perlukan intervensi gizi targeted dan koordinasi lintas sektor."
+    else:
+        status_color = "#d63031"
+        status_emoji = "🔴"
+        status_text = "Kritis"
+        rekomendasi = "Diperlukan intervensi intensif dan program khusus stunting segera!"
+    
+    st.markdown(f"""
+    <div style='background: linear-gradient(135deg, {status_color}15 0%, {status_color}05 100%); 
+                padding: 1.5rem; border-radius: 15px; border-left: 5px solid {status_color};
+                box-shadow: 0 4px 15px rgba(0,0,0,0.1);'>
+        <div style='display: flex; align-items: center; margin-bottom: 1rem;'>
+            <span style='font-size: 2rem; margin-right: 0.5rem;'>{status_emoji}</span>
+            <div>
+                <p style='margin: 0; font-size: 0.9rem; color: #718096;'>Status Wilayah</p>
+                <h3 style='margin: 0; color: {status_color};'>{status_text}</h3>
+            </div>
+        </div>
+        <p style='margin: 0; color: #4a5568; line-height: 1.6; font-size: 0.95rem;'>
+            {rekomendasi}
+        </p>
+    </div>
+    """, unsafe_allow_html=True)
+    
+    # Mini stats
+    st.markdown("<br>", unsafe_allow_html=True)
+    
+    kec_df_temp = df_filtered.groupby("nama_kecamatan").agg(
+        total_balita=("is_stunting", "count"),
+        total_kasus=("is_stunting", "sum")
+    ).reset_index()
+    kec_df_temp["prevalensi"] = (kec_df_temp["total_kasus"] / kec_df_temp["total_balita"] * 100)
+    
+    if len(kec_df_temp) > 0:
+        kec_tertinggi = kec_df_temp.loc[kec_df_temp["prevalensi"].idxmax()]
+        kec_terendah = kec_df_temp.loc[kec_df_temp["prevalensi"].idxmin()]
+        
+        st.markdown(f"""
+        <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 0.5rem;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);'>
+            <p style='margin: 0; font-size: 0.85rem; color: #718096;'>🔴 Kecamatan Tertinggi</p>
+            <p style='margin: 0.3rem 0 0 0; font-weight: 600; color: #2d3748;'>{kec_tertinggi['nama_kecamatan']}</p>
+            <p style='margin: 0; font-size: 1.3rem; color: #f5576c; font-weight: 700;'>{kec_tertinggi['prevalensi']:.1f}%</p>
+        </div>
+        
+        <div style='background: white; padding: 1rem; border-radius: 10px;
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1);'>
+            <p style='margin: 0; font-size: 0.85rem; color: #718096;'>🟢 Kecamatan Terendah</p>
+            <p style='margin: 0.3rem 0 0 0; font-weight: 600; color: #2d3748;'>{kec_terendah['nama_kecamatan']}</p>
+            <p style='margin: 0; font-size: 1.3rem; color: #43e97b; font-weight: 700;'>{kec_terendah['prevalensi']:.1f}%</p>
+        </div>
+        """, unsafe_allow_html=True)
 
-st.plotly_chart(fig_gauge, width='stretch', key="gauge_chart_main")
-
-st.divider()
+st.markdown("<br>", unsafe_allow_html=True)
 
 # ===============================
-# AGREGASI DATA (SEBELUM TAB!)
+# AGREGASI DATA
 # ===============================
-
-# AGREGASI PER KECAMATAN
 kec_df = df_filtered.groupby("nama_kecamatan").agg(
     total_balita=("is_stunting", "count"),
     total_kasus=("is_stunting", "sum")
 ).reset_index()
-
 kec_df["prevalensi"] = (kec_df["total_kasus"] / kec_df["total_balita"] * 100)
 
-# AGREGASI PER KELOMPOK UMUR
 def categorize_age(age):
     try:
         age = float(age)
@@ -183,9 +504,7 @@ age_df = df_temp.groupby("kelompok_umur").agg(
     total_kasus=("is_stunting", "sum")
 ).reset_index()
 
-# Filter out "Unknown" jika ada
 age_df = age_df[age_df["kelompok_umur"] != "Unknown"]
-
 age_df["prevalensi"] = (age_df["total_kasus"] / age_df["total_balita"] * 100)
 
 age_order = ["0-12 Bulan", "13-24 Bulan", "25-36 Bulan", "37-60 Bulan"]
@@ -193,71 +512,46 @@ age_df["kelompok_umur"] = pd.Categorical(age_df["kelompok_umur"], categories=age
 age_df = age_df.sort_values("kelompok_umur")
 
 # ===============================
-# TAB NAVIGATION UNTUK BERBAGAI VISUALISASI
+# TAB NAVIGATION - MODERN STYLE
 # ===============================
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🗺️ Peta Prevalensi",
-    "📊 Kelompok Umur", 
-    "🏆 Ranking Kecamatan",
-    "🔬 Diagnostik Z-Score",
-    "📋 Data Lengkap"
+tab1, tab2, tab3, tab4 = st.tabs([
+    "🗺️ Peta Interaktif",
+    "📊 Analisis Umur", 
+    "🏆 Ranking Wilayah",
+    "📈 Insight & Tren"
 ])
 
-# ===============================
-# TAB 1: PETA PREVALENSI
-# ===============================
+# TAB 1: PETA
 with tab1:
-    st.subheader("🗺️ Peta Prevalensi Stunting per Kecamatan")
-
-    col_style, col_color, col_zoom = st.columns([2, 2, 1])
-
-    with col_style:
+    st.markdown("### 🗺️ Peta Prevalensi Stunting per Kecamatan")
+    
+    col_ctrl1, col_ctrl2, col_ctrl3 = st.columns(3)
+    
+    with col_ctrl1:
         map_style = st.selectbox(
-            "🗺️ Style Peta:",
-            [
-                "Default (Light)", 
-                "Default (Dark)",
-                "Street Map",
-                "Outdoor/Topografi",
-                "Minimalis",
-                "Stamen Terrain",
-                "Stamen Toner"
-            ],
-            index=0,
-            key="map_style_tab1"
+            "Style Peta",
+            ["Default (Light)", "Default (Dark)", "Street Map", "Outdoor/Topografi"],
+            key="map_style"
         )
         
         style_mapping = {
             "Default (Light)": "carto-positron",
             "Default (Dark)": "carto-darkmatter",
             "Street Map": "open-street-map",
-            "Outdoor/Topografi": "stamen-terrain",
-            "Minimalis": "basic",
-            "Stamen Terrain": "stamen-terrain",
-            "Stamen Toner": "stamen-toner"
+            "Outdoor/Topografi": "stamen-terrain"
         }
         mapbox_style = style_mapping[map_style]
-
-    with col_color:
+    
+    with col_ctrl2:
         color_scheme = st.selectbox(
-            "🎨 Skema Warna:",
-            ["RdYlGn_r", "Turbo", "Jet", "Hot", "Rainbow", "Portland", "Picnic", "Reds"],
-            index=0,
-            key="color_scheme_tab1"
+            "Skema Warna",
+            ["RdYlGn_r", "Turbo", "Rainbow", "Reds", "Portland"],
+            key="color_scheme"
         )
-
-    with col_zoom:
-        zoom_level = st.slider(
-            "🔍 Zoom:",
-            min_value=8,
-            max_value=13,
-            value=10,
-            step=1,
-            key="zoom_tab1"
-        )
-
-    # Catatan: choropleth_mapbox masih digunakan karena choropleth_map memerlukan migrasi ke MapLibre
-    # Untuk sementara gunakan choropleth_mapbox dengan suppressing warning
+    
+    with col_ctrl3:
+        zoom_level = st.slider("Level Zoom", 8, 13, 10, key="zoom")
+    
     fig_map = px.choropleth_mapbox(
         kec_df,
         geojson=geojson,
@@ -283,879 +577,302 @@ with tab1:
             "total_kasus": "Kasus Stunting"
         }
     )
-
+    
     fig_map.update_layout(
         margin={"r": 0, "t": 0, "l": 0, "b": 0},
-        height=600,
-        coloraxis_colorbar={
-            "title": "Prevalensi<br>Stunting (%)",
-            "thickness": 20,
-            "len": 0.7,
-            "x": 1.02,
-            "tickvals": [0, 20, 40, 60, 80, 100],
-            "ticktext": ["0%", "20%", "40%", "60%", "80%", "100%"]
-        }
-    )
-
-    st.plotly_chart(fig_map, width='stretch', key="map_chart_tab1")
-
-    st.markdown("""
-    <div style="background-color: #f8f9fa; padding: 15px; border-radius: 8px; margin-top: 10px;">
-        <strong>📌 Keterangan Prevalensi:</strong><br>
-        • <span style="color: #d73027; font-weight: bold;">Merah Tua</span>: Sangat Tinggi (≥80%)<br>
-        • <span style="color: #fc8d59; font-weight: bold;">Orange</span>: Tinggi (60-79%)<br>
-        • <span style="color: #fee08b; font-weight: bold;">Kuning</span>: Sedang (40-59%)<br>
-        • <span style="color: #d9ef8b; font-weight: bold;">Hijau Muda</span>: Rendah (20-39%)<br>
-        • <span style="color: #1a9850; font-weight: bold;">Hijau Tua</span>: Sangat Rendah (<20%)
-    </div>
-    """, unsafe_allow_html=True)
-
-# ===============================
-# TAB 2: KELOMPOK UMUR
-# ===============================
-with tab2:
-    st.subheader("📊 Fase Kritis: Prevalensi Berdasarkan Kelompok Umur")
-    
-    # Cek apakah ada data
-    if len(age_df) > 0:
-        col_chart, col_table = st.columns([2, 1])
-        
-        with col_chart:
-            fig_age = px.bar(
-                age_df,
-                x="kelompok_umur",
-                y="prevalensi",
-                text=age_df["prevalensi"].round(1).astype(str) + "%",
-                color="prevalensi",
-                color_continuous_scale="Plasma",
-                labels={
-                    "kelompok_umur": "Kelompok Umur",
-                    "prevalensi": "Prevalensi Stunting (%)"
-                }
-            )
-
-            fig_age.update_traces(
-                textposition="outside",
-                textfont_size=14
-            )
-
-            fig_age.update_layout(
-                height=500,
-                showlegend=False,
-                yaxis_range=[0, age_df["prevalensi"].max() * 1.15]
-            )
-
-            st.plotly_chart(fig_age, width='stretch', key="age_chart_tab2")
-        
-        with col_table:
-            st.markdown("#### 📋 Detail Data")
-            for _, row in age_df.iterrows():
-                st.markdown(f"""
-                <div style="
-                    background-color: #f8f9fa;
-                    padding: 12px;
-                    border-radius: 8px;
-                    margin-bottom: 10px;
-                    border-left: 4px solid #6366f1;
-                ">
-                    <div style="font-size: 13px; color: #666; font-weight: 600;">
-                        {row['kelompok_umur']}
-                    </div>
-                    <div style="font-size: 24px; color: #6366f1; font-weight: bold; margin: 5px 0;">
-                        {row['prevalensi']:.1f}%
-                    </div>
-                    <div style="font-size: 12px; color: #888;">
-                        {row['total_kasus']:,} / {row['total_balita']:,} balita
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Insight
-        st.markdown("---")
-        st.subheader("💡 Insight")
-        
-        max_idx = age_df["prevalensi"].idxmax()
-        max_age_group = age_df.loc[max_idx, "kelompok_umur"]
-        max_prevalensi = age_df.loc[max_idx, "prevalensi"]
-        
-        min_idx = age_df["prevalensi"].idxmin()
-        min_age_group = age_df.loc[min_idx, "kelompok_umur"]
-        min_prevalensi = age_df.loc[min_idx, "prevalensi"]
-        
-        col1, col2 = st.columns(2)
-        with col1:
-            st.error(f"🔴 **Kelompok Tertinggi:** {max_age_group} ({max_prevalensi:.1f}%)")
-        with col2:
-            st.success(f"🟢 **Kelompok Terendah:** {min_age_group} ({min_prevalensi:.1f}%)")
-    else:
-        st.warning("⚠️ Tidak ada data untuk ditampilkan. Silakan sesuaikan filter.")
-
-# ===============================
-# TAB 3: RANKING KECAMATAN
-# ===============================
-with tab3:
-    st.subheader("🏆 Ranking Kecamatan Berdasarkan Prevalensi")
-    
-    # Pilihan Top N
-    top_n = st.radio(
-        "Tampilkan:",
-        ["Top 5", "Top 10", "Top 15", "Semua Kecamatan"],
-        horizontal=True,
-        key="top_n_radio"
-    )
-    
-    # Tentukan jumlah data
-    if top_n == "Top 5":
-        n = 5
-    elif top_n == "Top 10":
-        n = 10
-    elif top_n == "Top 15":
-        n = 15
-    else:
-        n = len(kec_df)
-    
-    top_data = kec_df.sort_values("prevalensi", ascending=False).head(n)
-    
-    col_chart, col_cards = st.columns([2, 1])
-    
-    with col_chart:
-        fig_bar = px.bar(
-            top_data,
-            x="prevalensi",
-            y="nama_kecamatan",
-            orientation="h",
-            text=top_data["prevalensi"].round(2).astype(str) + "%",
-            color="prevalensi",
-            color_continuous_scale="Reds"
-        )
-        
-        fig_bar.update_traces(
-            textposition="outside",
-            textfont_size=12
-        )
-        
-        fig_bar.update_layout(
-            xaxis_title="Prevalensi (%)",
-            yaxis_title="",
-            showlegend=False,
-            height=max(500, n * 40),
-            yaxis={'categoryorder': 'total ascending'}
-        )
-        
-        st.plotly_chart(fig_bar, width='stretch', key="bar_chart_tab3")
-    
-    with col_cards:
-        st.markdown(f"#### 🎯 {top_n}")
-        
-        for i, (idx, row) in enumerate(top_data.head(5).iterrows(), 1):
-            if i == 1:
-                border_color = "#dc2626"
-                bg_color = "#fee2e2"
-            elif i == 2:
-                border_color = "#ea580c"
-                bg_color = "#ffedd5"
-            elif i == 3:
-                border_color = "#f59e0b"
-                bg_color = "#fef3c7"
-            else:
-                border_color = "#f97316"
-                bg_color = "#fff7ed"
-            
-            st.markdown(f"""
-            <div style="
-                background-color: {bg_color};
-                padding: 12px;
-                border-radius: 10px;
-                margin-bottom: 10px;
-                border-left: 5px solid {border_color};
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            ">
-                <div style="font-size: 12px; color: #666; font-weight: 600;">
-                    #{i} {row['nama_kecamatan']}
-                </div>
-                <div style="font-size: 28px; color: {border_color}; font-weight: bold; margin: 5px 0;">
-                    {row['prevalensi']:.2f}%
-                </div>
-                <div style="font-size: 11px; color: #666;">
-                    {row['total_kasus']:,} / {row['total_balita']:,} balita
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
-    # Statistik
-    st.markdown("---")
-    st.subheader("📊 Statistik")
-    
-    stat_col1, stat_col2, stat_col3 = st.columns(3)
-    
-    with stat_col1:
-        st.metric(
-            f"Rata-rata Prevalensi ({top_n})",
-            f"{top_data['prevalensi'].mean():.2f}%"
-        )
-    
-    with stat_col2:
-        st.metric(
-            "Kecamatan Tertinggi",
-            f"{top_data.iloc[0]['nama_kecamatan']}",
-            f"{top_data.iloc[0]['prevalensi']:.1f}%"
-        )
-    
-    with stat_col3:
-        total_kasus_top = top_data["total_kasus"].sum()
-        st.metric(
-            f"Total Kasus ({top_n})",
-            f"{total_kasus_top:,}"
-        )
-
-# ===============================
-# TAB 4: DIAGNOSTIK Z-SCORE
-# ===============================
-with tab4:
-    st.subheader("🔬 Diagnostik Z-Score (TB/U vs BB/U)")
-    
-    # Cek kolom z-score - lebih fleksibel
-    zscore_cols = [col for col in df_filtered.columns if ('z' in col.lower() or 'score' in col.lower() or 'tb' in col.lower() or 'bb' in col.lower()) and col != 'is_stunting']
-    
-    if len(zscore_cols) >= 2:
-        col_z1, col_z2 = st.columns(2)
-        
-        with col_z1:
-            col_tbu = st.selectbox("📏 Pilih Kolom TB/U", zscore_cols, key="tbu_tab4")
-        
-        with col_z2:
-            col_bbu = st.selectbox("⚖️ Pilih Kolom BB/U", zscore_cols, key="bbu_tab4", index=min(1, len(zscore_cols)-1))
-        
-        # Bersihkan data
-        df_plot = df_filtered[[col_tbu, col_bbu, "is_stunting"]].copy().dropna()
-        df_plot = df_plot.loc[:, ~df_plot.columns.duplicated()]
-        
-        if col_tbu != col_bbu and len(df_plot) > 0:
-            fig_scatter = px.scatter(
-                df_plot,
-                x=col_tbu,
-                y=col_bbu,
-                color="is_stunting",
-                color_discrete_map={0: "green", 1: "red"},
-                labels={
-                    col_tbu: "Z-Score TB/U",
-                    col_bbu: "Z-Score BB/U",
-                    "is_stunting": "Status"
-                }
-            )
-            
-            fig_scatter.add_hline(y=-2, line_dash="dash", line_color="orange", annotation_text="Threshold BB/U (-2)")
-            fig_scatter.add_vline(x=-2, line_dash="dash", line_color="orange", annotation_text="Threshold TB/U (-2)")
-            
-            fig_scatter.update_layout(
-                height=600,
-                showlegend=True
-            )
-            
-            fig_scatter.for_each_trace(lambda t: t.update(name="Normal" if t.name == "0" else "Stunting"))
-            
-            st.plotly_chart(fig_scatter, width='stretch', key="scatter_chart_tab4")
-            
-            # Statistik
-            st.markdown("---")
-            col1, col2, col3, col4 = st.columns(4)
-            
-            stunting = df_plot[df_plot["is_stunting"] == 1]
-            normal = df_plot[df_plot["is_stunting"] == 0]
-            
-            with col1:
-                st.metric("Total Balita", len(df_plot))
-            
-            with col2:
-                st.metric("Stunting", len(stunting), delta=f"{len(stunting)/len(df_plot)*100:.1f}%")
-            
-            with col3:
-                if len(stunting) > 0:
-                    st.metric("Rata-rata TB/U (Stunting)", f"{stunting[col_tbu].mean():.2f}")
-                else:
-                    st.metric("Rata-rata TB/U (Stunting)", "N/A")
-            
-            with col4:
-                if len(normal) > 0:
-                    st.metric("Rata-rata TB/U (Normal)", f"{normal[col_tbu].mean():.2f}")
-                else:
-                    st.metric("Rata-rata TB/U (Normal)", "N/A")
-            
-            # Interpretasi
-            st.markdown("---")
-            st.subheader("💡 Interpretasi Z-Score")
-            
-            st.info("""
-            **Klasifikasi Z-Score WHO:**
-            - **Normal**: Z-Score ≥ -2 SD
-            - **Stunted (Pendek)**: -3 SD ≤ Z-Score < -2 SD
-            - **Severely Stunted (Sangat Pendek)**: Z-Score < -3 SD
-            
-            **Kuadran pada scatter plot:**
-            - 🟢 **Kanan atas**: Normal TB/U dan BB/U
-            - 🔴 **Kiri bawah**: Berisiko stunting dan underweight
-            - 🟡 **Kiri atas**: Pendek tapi berat badan cukup
-            - 🟡 **Kanan bawah**: Tinggi normal tapi underweight
-            """)
-        else:
-            if col_tbu == col_bbu:
-                st.warning("⚠️ Pilih kolom yang berbeda untuk TB/U dan BB/U")
-            else:
-                st.warning("⚠️ Tidak ada data untuk ditampilkan setelah filter diterapkan")
-    else:
-        st.info("ℹ️ Kolom Z-Score tidak tersedia dalam dataset. Menampilkan analisis alternatif.")
-        
-        # Visualisasi 1: Distribusi Status Stunting
-        st.markdown("### 📊 Distribusi Status Stunting")
-        
-        col_pie, col_bar_status = st.columns(2)
-        
-        with col_pie:
-            status_count = df_filtered["is_stunting"].value_counts()
-            
-            fig_pie = px.pie(
-                values=status_count.values,
-                names=["Normal", "Stunting"],
-                color_discrete_sequence=["#10b981", "#ef4444"],
-                hole=0.4,
-                title="Proporsi Stunting vs Normal"
-            )
-            
-            fig_pie.update_traces(
-                textposition='inside', 
-                textinfo='percent+label',
-                textfont_size=14
-            )
-            fig_pie.update_layout(height=400)
-            
-            st.plotly_chart(fig_pie, width='stretch', key="pie_chart_tab4")
-        
-        with col_bar_status:
-            status_df = pd.DataFrame({
-                'Status': ['Normal', 'Stunting'],
-                'Jumlah': [status_count.get(0, 0), status_count.get(1, 0)]
-            })
-            
-            fig_bar_status = px.bar(
-                status_df,
-                x='Status',
-                y='Jumlah',
-                text='Jumlah',
-                color='Status',
-                color_discrete_map={'Normal': '#10b981', 'Stunting': '#ef4444'},
-                title="Jumlah Balita per Status"
-            )
-            
-            fig_bar_status.update_traces(textposition='outside')
-            fig_bar_status.update_layout(height=400, showlegend=False)
-            
-            st.plotly_chart(fig_bar_status, width='stretch', key="bar_status_tab4")
-        
-        # Visualisasi 2: Stunting per Kecamatan (Top 10)
-        st.markdown("---")
-        st.markdown("### 🗺️ Top 10 Kecamatan dengan Kasus Stunting Tertinggi")
-        
-        kec_stunting = df_filtered.groupby("nama_kecamatan").agg(
-            total=("is_stunting", "count"),
-            stunting=("is_stunting", "sum")
-        ).reset_index()
-        
-        kec_stunting["persen"] = (kec_stunting["stunting"] / kec_stunting["total"] * 100).round(2)
-        top10_stunting = kec_stunting.sort_values("stunting", ascending=False).head(10)
-        
-        fig_kec = px.bar(
-            top10_stunting,
-            x="stunting",
-            y="nama_kecamatan",
-            orientation="h",
-            text=top10_stunting.apply(lambda x: f"{int(x['stunting'])} ({x['persen']:.1f}%)", axis=1),
-            color="persen",
-            color_continuous_scale="Reds",
-            labels={"stunting": "Jumlah Kasus", "nama_kecamatan": "Kecamatan", "persen": "Prevalensi (%)"}
-        )
-        
-        fig_kec.update_traces(textposition="outside")
-        fig_kec.update_layout(
-            height=500,
-            yaxis={'categoryorder': 'total ascending'}
-        )
-        
-        st.plotly_chart(fig_kec, width='stretch', key="kec_stunting_tab4")
-        
-        # Visualisasi 3: Stunting per Kelompok Umur
-        st.markdown("---")
-        st.markdown("### 👶 Distribusi Stunting per Kelompok Umur")
-        
-        if len(age_df) > 0:
-            col_age1, col_age2 = st.columns(2)
-            
-            with col_age1:
-                fig_age_stunting = px.bar(
-                    age_df,
-                    x="kelompok_umur",
-                    y="total_kasus",
-                    text="total_kasus",
-                    color="prevalensi",
-                    color_continuous_scale="Oranges",
-                    labels={"total_kasus": "Jumlah Kasus", "kelompok_umur": "Kelompok Umur"},
-                    title="Jumlah Kasus per Kelompok Umur"
-                )
-                
-                fig_age_stunting.update_traces(textposition="outside")
-                fig_age_stunting.update_layout(height=400)
-                
-                st.plotly_chart(fig_age_stunting, width='stretch', key="age_kasus_tab4")
-            
-            with col_age2:
-                fig_age_prev = px.line(
-                    age_df,
-                    x="kelompok_umur",
-                    y="prevalensi",
-                    markers=True,
-                    text=age_df["prevalensi"].round(1).astype(str) + "%",
-                    title="Tren Prevalensi per Kelompok Umur"
-                )
-                
-                fig_age_prev.update_traces(
-                    textposition="top center",
-                    line=dict(color='#f97316', width=3),
-                    marker=dict(size=12)
-                )
-                fig_age_prev.update_layout(
-                    height=400,
-                    yaxis_title="Prevalensi (%)"
-                )
-                
-                st.plotly_chart(fig_age_prev, width='stretch', key="age_prev_tab4")
-        
-        # Statistik Ringkas
-        st.markdown("---")
-        st.markdown("### 📈 Statistik Ringkas")
-        
-        stat1, stat2, stat3, stat4 = st.columns(4)
-        
-        with stat1:
-            st.metric(
-                "Total Balita Diperiksa",
-                f"{len(df_filtered):,}",
-                help="Jumlah total balita yang telah diskrining"
-            )
-        
-        with stat2:
-            total_stunting = int(df_filtered["is_stunting"].sum())
-            st.metric(
-                "Total Kasus Stunting",
-                f"{total_stunting:,}",
-                delta=f"{(total_stunting/len(df_filtered)*100):.1f}%",
-                delta_color="inverse",
-                help="Jumlah balita dengan status stunting"
-            )
-        
-        with stat3:
-            if len(age_df) > 0:
-                max_age = age_df.loc[age_df["prevalensi"].idxmax(), "kelompok_umur"]
-                max_prev = age_df["prevalensi"].max()
-                st.metric(
-                    "Kelompok Tertinggi",
-                    max_age,
-                    delta=f"{max_prev:.1f}%",
-                    delta_color="inverse",
-                    help="Kelompok umur dengan prevalensi tertinggi"
-                )
-            else:
-                st.metric("Kelompok Tertinggi", "N/A")
-        
-        with stat4:
-            if len(kec_df) > 0:
-                max_kec = kec_df.loc[kec_df["prevalensi"].idxmax(), "nama_kecamatan"]
-                max_kec_prev = kec_df["prevalensi"].max()
-                st.metric(
-                    "Kecamatan Tertinggi",
-                    max_kec,
-                    delta=f"{max_kec_prev:.1f}%",
-                    delta_color="inverse",
-                    help="Kecamatan dengan prevalensi tertinggi"
-                )
-            else:
-                st.metric("Kecamatan Tertinggi", "N/A")
-
-# ===============================
-# TAB 5: DATA LENGKAP
-# ===============================
-with tab5:
-    st.subheader("📋 Data Lengkap per Kecamatan")
-    
-    kec_sorted = kec_df.sort_values("prevalensi", ascending=False).reset_index(drop=True)
-    kec_sorted.insert(0, "Rank", range(1, len(kec_sorted) + 1))
-    
-    display_df = pd.DataFrame({
-        "Rank": kec_sorted["Rank"].apply(lambda x: f"#{x}"),
-        "Kecamatan": kec_sorted["nama_kecamatan"],
-        "Total Balita": kec_sorted["total_balita"],
-        "Kasus Stunting": kec_sorted["total_kasus"],
-        "Prevalensi": kec_sorted["prevalensi"].apply(lambda x: f"{x:.2f}%")
-    })
-    
-    st.dataframe(
-        display_df,
-        width='stretch',
-        hide_index=True,
         height=600
     )
     
-    # Download button
-    st.markdown("---")
-    csv = kec_sorted.to_csv(index=False).encode('utf-8')
-    st.download_button(
-        label="📥 Download Data CSV",
-        data=csv,
-        file_name="data_prevalensi_kecamatan.csv",
-        mime="text/csv"
-    )
+    st.plotly_chart(fig_map, use_container_width=True)
 
-st.divider()
-
-# ===============================
-# LAYOUT 2 KOLOM: BAR CHART & TOP 5
-# ===============================
-col1, col2 = st.columns([2, 1])
-
-with col1:
-    st.subheader("📍 Top 10 Kecamatan dengan Prevalensi Tertinggi")
+# TAB 2: ANALISIS UMUR
+with tab2:
+    st.markdown("### 📊 Analisis Fase Kritis Berdasarkan Kelompok Umur")
     
-    top10 = kec_df.sort_values("prevalensi", ascending=False).head(10)
+    if len(age_df) > 0:
+        fig_age = make_subplots(
+            rows=1, cols=2,
+            subplot_titles=("Prevalensi per Kelompok Umur", "Jumlah Kasus per Kelompok"),
+            specs=[[{"type": "bar"}, {"type": "bar"}]]
+        )
+        
+        # Chart 1: Prevalensi
+        fig_age.add_trace(
+            go.Bar(
+                x=age_df["kelompok_umur"],
+                y=age_df["prevalensi"],
+                text=age_df["prevalensi"].round(1).astype(str) + "%",
+                textposition="outside",
+                marker=dict(
+                    color=age_df["prevalensi"],
+                    colorscale="Plasma",
+                    showscale=False
+                ),
+                name="Prevalensi"
+            ),
+            row=1, col=1
+        )
+        
+        # Chart 2: Jumlah Kasus
+        fig_age.add_trace(
+            go.Bar(
+                x=age_df["kelompok_umur"],
+                y=age_df["total_kasus"],
+                text=age_df["total_kasus"],
+                textposition="outside",
+                marker=dict(color="#f5576c"),
+                name="Kasus"
+            ),
+            row=1, col=2
+        )
+        
+        fig_age.update_layout(
+            height=500,
+            showlegend=False,
+            font=dict(size=12)
+        )
+        
+        fig_age.update_yaxes(title_text="Prevalensi (%)", row=1, col=1)
+        fig_age.update_yaxes(title_text="Jumlah Kasus", row=1, col=2)
+        
+        st.plotly_chart(fig_age, use_container_width=True)
+        
+        # Cards untuk setiap kelompok
+        st.markdown("<br>", unsafe_allow_html=True)
+        st.markdown("#### 📋 Detail per Kelompok Umur")
+        
+        cols = st.columns(len(age_df))
+        for idx, (_, row) in enumerate(age_df.iterrows()):
+            with cols[idx]:
+                color = "#f5576c" if row['prevalensi'] >= 30 else "#feca57" if row['prevalensi'] >= 20 else "#43e97b"
+                st.markdown(f"""
+                <div style='background: linear-gradient(135deg, {color}15 0%, {color}05 100%); 
+                            padding: 1.2rem; border-radius: 12px; text-align: center;
+                            border: 2px solid {color}30;'>
+                    <p style='margin: 0; font-size: 0.9rem; color: #718096; font-weight: 600;'>{row['kelompok_umur']}</p>
+                    <h2 style='margin: 0.5rem 0; color: {color}; font-size: 2rem;'>{row['prevalensi']:.1f}%</h2>
+                    <p style='margin: 0; font-size: 0.85rem; color: #4a5568;'>{row['total_kasus']:,} / {row['total_balita']:,}</p>
+                </div>
+                """, unsafe_allow_html=True)
+
+# TAB 3: RANKING
+with tab3:
+    st.markdown("### 🏆 Ranking Kecamatan Berdasarkan Prevalensi")
     
-    fig_bar = px.bar(
-        top10,
-        x="prevalensi",
-        y="nama_kecamatan",
-        orientation="h",
-        text=top10["prevalensi"].round(2).astype(str) + "%",
-        color="prevalensi",
-        color_continuous_scale="Reds"
+    top_n_option = st.radio(
+        "Tampilkan:",
+        ["Top 5", "Top 10", "Semua"],
+        horizontal=True,
+        key="top_n"
     )
     
-    fig_bar.update_traces(
-        textposition="outside",
-        textfont_size=12
-    )
+    n = 5 if top_n_option == "Top 5" else 10 if top_n_option == "Top 10" else len(kec_df)
+    top_data = kec_df.sort_values("prevalensi", ascending=False).head(n)
+    
+    # Horizontal bar chart
+    fig_bar = go.Figure()
+    
+    colors = px.colors.sequential.Reds_r
+    
+    fig_bar.add_trace(go.Bar(
+        y=top_data["nama_kecamatan"],
+        x=top_data["prevalensi"],
+        orientation='h',
+        text=top_data["prevalensi"].round(1).astype(str) + "%",
+        textposition='outside',
+        marker=dict(
+            color=top_data["prevalensi"],
+            colorscale="Reds",
+            showscale=True,
+            colorbar=dict(title="Prevalensi<br>(%)")
+        ),
+        hovertemplate="<b>%{y}</b><br>" +
+                      "Prevalensi: %{x:.2f}%<br>" +
+                      "<extra></extra>"
+    ))
     
     fig_bar.update_layout(
-        xaxis_title="Prevalensi (%)",
+        height=max(400, n * 50),
+        yaxis={'categoryorder': 'total ascending'},
+        xaxis_title="Prevalensi Stunting (%)",
         yaxis_title="",
         showlegend=False,
-        height=500,
-        yaxis={'categoryorder': 'total ascending'}
+        font=dict(size=12)
     )
     
-    st.plotly_chart(fig_bar, width='stretch', key="bar_chart_bottom")
-
-with col2:
-    st.subheader("🏆 Top 5 Kecamatan")
+    st.plotly_chart(fig_bar, use_container_width=True)
     
-    top5 = kec_df.sort_values("prevalensi", ascending=False).head(5)
+    # Top 3 Cards
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🥇 Podium Prevalensi Tertinggi")
     
-    for i, (idx, row) in enumerate(top5.iterrows(), 1):
-        if i == 1:
-            border_color = "#dc2626"
-            bg_color = "#fee2e2"
-        elif i == 2:
-            border_color = "#ea580c"
-            bg_color = "#ffedd5"
-        elif i == 3:
-            border_color = "#f59e0b"
-            bg_color = "#fef3c7"
-        else:
-            border_color = "#f97316"
-            bg_color = "#fff7ed"
-        
-        st.markdown(f"""
-        <div style="
-            background-color: {bg_color};
-            padding: 15px;
-            border-radius: 10px;
-            margin-bottom: 12px;
-            border-left: 5px solid {border_color};
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-        ">
-            <div style="display: flex; align-items: center; justify-content: space-between;">
-                <div style="flex: 1;">
-                    <div style="font-size: 14px; color: #666; font-weight: 600;">
-                        #{i} {row['nama_kecamatan']}
-                    </div>
-                    <div style="font-size: 32px; color: {border_color}; font-weight: bold; margin: 8px 0;">
-                        {row['prevalensi']:.2f}%
-                    </div>
-                    <div style="font-size: 13px; color: #666;">
-                        {row['total_kasus']:,} dari {row['total_balita']:,} balita
-                    </div>
-                </div>
+    col1, col2, col3 = st.columns(3)
+    top3 = top_data.head(3)
+    
+    medals = ["🥇", "🥈", "🥉"]
+    colors_medal = ["#FFD700", "#C0C0C0", "#CD7F32"]
+    
+    for idx, (col, (_, row)) in enumerate(zip([col1, col2, col3], top3.iterrows())):
+        with col:
+            st.markdown(f"""
+            <div style='background: linear-gradient(135deg, {colors_medal[idx]}20 0%, {colors_medal[idx]}05 100%);
+                        padding: 1.5rem; border-radius: 15px; text-align: center;
+                        border: 3px solid {colors_medal[idx]}; box-shadow: 0 8px 20px rgba(0,0,0,0.15);'>
+                <div style='font-size: 3rem; margin-bottom: 0.5rem;'>{medals[idx]}</div>
+                <h4 style='margin: 0; color: #2d3748;'>{row['nama_kecamatan']}</h4>
+                <h2 style='margin: 0.5rem 0; color: #f5576c; font-size: 2.5rem;'>{row['prevalensi']:.1f}%</h2>
+                <p style='margin: 0; color: #718096; font-size: 0.9rem;'>{row['total_kasus']:,} kasus dari {row['total_balita']:,} balita</p>
             </div>
+            """, unsafe_allow_html=True)
+
+# TAB 4: INSIGHT
+with tab4:
+    st.markdown("### 📈 Insight & Tren Data")
+    
+    # Comparison chart
+    col_chart1, col_chart2 = st.columns(2)
+    
+    with col_chart1:
+        st.markdown("#### 🍩 Distribusi Status Balita")
+        
+        status_data = pd.DataFrame({
+            'Status': ['Normal', 'Stunting'],
+            'Jumlah': [total_balita - total_kasus, total_kasus],
+            'Persentase': [(total_balita - total_kasus)/total_balita*100, prevalensi]
+        })
+        
+        fig_pie = go.Figure(data=[go.Pie(
+            labels=status_data['Status'],
+            values=status_data['Jumlah'],
+            hole=0.5,
+            marker=dict(colors=['#43e97b', '#f5576c']),
+            textinfo='label+percent',
+            textfont_size=14,
+            hovertemplate="<b>%{label}</b><br>" +
+                         "Jumlah: %{value:,}<br>" +
+                         "Persentase: %{percent}<br>" +
+                         "<extra></extra>"
+        )])
+        
+        fig_pie.update_layout(
+            height=400,
+            annotations=[dict(text=f'{prevalensi:.1f}%', x=0.5, y=0.5, 
+                            font_size=28, showarrow=False, font_color='#667eea')]
+        )
+        
+        st.plotly_chart(fig_pie, use_container_width=True)
+    
+    with col_chart2:
+        st.markdown("#### 📊 Statistik Wilayah")
+        
+        # Stats
+        stats_metrics = {
+            "Total Kecamatan": len(kec_df),
+            "Rata-rata Prevalensi": f"{kec_df['prevalensi'].mean():.2f}%",
+            "Median Prevalensi": f"{kec_df['prevalensi'].median():.2f}%",
+            "Std Deviasi": f"{kec_df['prevalensi'].std():.2f}%"
+        }
+        
+        for label, value in stats_metrics.items():
+            st.markdown(f"""
+            <div style='background: white; padding: 1rem; border-radius: 10px; margin-bottom: 0.8rem;
+                        border-left: 4px solid #667eea; box-shadow: 0 2px 8px rgba(0,0,0,0.1);'>
+                <p style='margin: 0; font-size: 0.85rem; color: #718096;'>{label}</p>
+                <h3 style='margin: 0.3rem 0 0 0; color: #2d3748;'>{value}</h3>
+            </div>
+            """, unsafe_allow_html=True)
+    
+    # Heatmap distribusi
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 🗺️ Heatmap Distribusi Prevalensi")
+    
+    # Categorize prevalensi
+    kec_df_cat = kec_df.copy()
+    kec_df_cat['kategori'] = pd.cut(
+        kec_df_cat['prevalensi'],
+        bins=[0, 20, 40, 60, 80, 100],
+        labels=['Sangat Rendah', 'Rendah', 'Sedang', 'Tinggi', 'Sangat Tinggi']
+    )
+    
+    kategori_count = kec_df_cat['kategori'].value_counts().reindex(
+        ['Sangat Rendah', 'Rendah', 'Sedang', 'Tinggi', 'Sangat Tinggi'],
+        fill_value=0
+    )
+    
+    fig_kategori = go.Figure(data=[go.Bar(
+        x=kategori_count.index,
+        y=kategori_count.values,
+        text=kategori_count.values,
+        textposition='outside',
+        marker=dict(
+            color=['#43e97b', '#feca57', '#ff7675', '#d63031', '#8B0000'],
+            line=dict(color='white', width=2)
+        ),
+        hovertemplate="<b>%{x}</b><br>" +
+                     "Jumlah Kecamatan: %{y}<br>" +
+                     "<extra></extra>"
+    )])
+    
+    fig_kategori.update_layout(
+        height=400,
+        xaxis_title="Kategori Prevalensi",
+        yaxis_title="Jumlah Kecamatan",
+        showlegend=False
+    )
+    
+    st.plotly_chart(fig_kategori, use_container_width=True)
+    
+    # Rekomendasi
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.markdown("#### 💼 Rekomendasi Aksi")
+    
+    high_prev_kec = kec_df[kec_df['prevalensi'] >= 40]
+    medium_prev_kec = kec_df[(kec_df['prevalensi'] >= 20) & (kec_df['prevalensi'] < 40)]
+    
+    col_rec1, col_rec2 = st.columns(2)
+    
+    with col_rec1:
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #f5576c15 0%, #f5576c05 100%);
+                    padding: 1.5rem; border-radius: 15px; border-left: 5px solid #f5576c;'>
+            <h4 style='color: #f5576c; margin-top: 0;'>🚨 Prioritas Tinggi</h4>
+            <p style='color: #4a5568; margin: 0;'>
+                <strong>{len(high_prev_kec)} kecamatan</strong> dengan prevalensi ≥40% memerlukan:
+            </p>
+            <ul style='color: #4a5568; margin: 0.5rem 0;'>
+                <li>Intervensi gizi intensif</li>
+                <li>Program PMT segera</li>
+                <li>Monitoring mingguan</li>
+            </ul>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_rec2:
+        st.markdown(f"""
+        <div style='background: linear-gradient(135deg, #feca5715 0%, #feca5705 100%);
+                    padding: 1.5rem; border-radius: 15px; border-left: 5px solid #feca57;'>
+            <h4 style='color: #feca57; margin-top: 0;'>⚠️ Prioritas Sedang</h4>
+            <p style='color: #4a5568; margin: 0;'>
+                <strong>{len(medium_prev_kec)} kecamatan</strong> dengan prevalensi 20-40% perlu:
+            </p>
+            <ul style='color: #4a5568; margin: 0.5rem 0;'>
+                <li>Edukasi gizi keluarga</li>
+                <li>Pemantauan rutin</li>
+                <li>Program pencegahan</li>
+            </ul>
         </div>
         """, unsafe_allow_html=True)
 
-st.divider()
+st.markdown("<br><br>", unsafe_allow_html=True)
 
 # ===============================
-# STATISTIK RINGKAS
+# FOOTER dengan Credits
 # ===============================
-st.subheader("📊 Statistik Prevalensi Keseluruhan")
-
-stat_col1, stat_col2, stat_col3, stat_col4 = st.columns(4)
-
-with stat_col1:
-    st.metric(
-        "Rata-rata Prevalensi",
-        f"{kec_df['prevalensi'].mean():.2f}%"
-    )
-
-with stat_col2:
-    st.metric(
-        "Median Prevalensi",
-        f"{kec_df['prevalensi'].median():.2f}%"
-    )
-
-with stat_col3:
-    st.metric(
-        "Prevalensi Tertinggi",
-        f"{kec_df['prevalensi'].max():.2f}%"
-    )
-
-with stat_col4:
-    st.metric(
-        "Prevalensi Terendah",
-        f"{kec_df['prevalensi'].min():.2f}%"
-    )
-
-# ===============================
-# DEBUG & INFORMASI DATASET
-# ===============================
-with st.expander("🧪 Debug & Informasi Dataset", expanded=False):
-    st.markdown("### 📊 Ringkasan Dataset")
-    
-    # Statistik Umum
-    col1, col2, col3, col4 = st.columns(4)
-    
-    with col1:
-        st.metric("📋 Total Baris", f"{len(df):,}")
-    
-    with col2:
-        st.metric("🔽 Baris Terfilter", f"{len(df_filtered):,}")
-    
-    with col3:
-        st.metric("📍 Jumlah Kecamatan", f"{len(kec_df)}")
-    
-    with col4:
-        st.metric("📂 Jumlah Kolom", f"{len(df.columns)}")
-    
-    st.markdown("---")
-    
-    # Informasi Kolom
-    st.markdown("### 📋 Informasi Kolom Dataset")
-    
-    col_info = []
-    for idx, col in enumerate(df.columns, 1):
-        dtype = str(df[col].dtype)
-        null_count = df[col].isnull().sum()
-        null_pct = (null_count / len(df) * 100)
-        unique_count = df[col].nunique()
-        
-        # Ambil sample data dengan handling khusus
-        try:
-            if len(df) > 0:
-                sample_val = df[col].iloc[0]
-                
-                # Jika data terlalu panjang (seperti NIK terenkripsi), potong
-                if isinstance(sample_val, str) and len(sample_val) > 30:
-                    sample_data = sample_val[:30] + "..."
-                # Jika NIK atau nama, sembunyikan untuk privasi
-                elif col in ['nik_balita', 'nama_balita']:
-                    sample_data = "[PROTECTED]"
-                # Jika angka, format dengan baik
-                elif pd.notna(sample_val) and isinstance(sample_val, (int, float)):
-                    sample_data = f"{sample_val:.2f}" if isinstance(sample_val, float) else str(sample_val)
-                else:
-                    sample_data = str(sample_val)[:50]
-            else:
-                sample_data = "N/A"
-        except:
-            sample_data = "N/A"
-        
-        col_info.append({
-            "No": idx,
-            "Nama Kolom": col,
-            "Tipe Data": dtype,
-            "Unique Values": f"{unique_count:,}",
-            "Missing Values": f"{null_count:,} ({null_pct:.1f}%)",
-            "Sample Data": sample_data
-        })
-    
-    df_col_info = pd.DataFrame(col_info)
-    
-    st.dataframe(
-        df_col_info,
-        width='stretch',
-        hide_index=True,
-        height=400
-    )
-    
-    st.markdown("---")
-    
-    # Preview Data
-    st.markdown("### 👀 Preview Data Agregasi")
-    
-    tab_preview1, tab_preview2, tab_preview3 = st.tabs([
-        "📍 Data per Kecamatan", 
-        "👶 Data per Kelompok Umur",
-        "🔍 Sample Data Mentah"
-    ])
-    
-    with tab_preview1:
-        st.markdown("**Top 10 Kecamatan berdasarkan Prevalensi:**")
-        preview_kec = kec_df.sort_values("prevalensi", ascending=False).head(10).copy()
-        preview_kec["prevalensi"] = preview_kec["prevalensi"].apply(lambda x: f"{x:.2f}%")
-        st.dataframe(
-            preview_kec,
-            width='stretch',
-            hide_index=True
-        )
-    
-    with tab_preview2:
-        st.markdown("**Data Prevalensi per Kelompok Umur:**")
-        if len(age_df) > 0:
-            preview_age = age_df.copy()
-            preview_age["prevalensi"] = preview_age["prevalensi"].apply(lambda x: f"{x:.2f}%")
-            st.dataframe(
-                preview_age,
-                width='stretch',
-                hide_index=True
-            )
-        else:
-            st.info("Tidak ada data kelompok umur")
-    
-    with tab_preview3:
-        st.markdown("**10 Baris Pertama Data Mentah (Terfilter):**")
-        
-        # Pilih kolom yang penting dan tampilkan dengan lebih baik
-        display_cols = [
-            'nama_kecamatan', 'umur_balita', 'jenis_kelamin_balita',
-            'bb_balita', 'tb_balita', 'stunting_balita'
-        ]
-        
-        # Filter hanya kolom yang ada
-        available_cols = [col for col in display_cols if col in df_filtered.columns]
-        
-        if len(available_cols) > 0:
-            preview_data = df_filtered[available_cols].head(10).copy()
-            
-            # Format data untuk tampilan lebih baik dengan validasi ketat
-            if 'umur_balita' in preview_data.columns:
-                preview_data['umur_balita'] = preview_data['umur_balita'].apply(
-                    lambda x: f"{float(x):.0f} bulan" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
-                )
-            
-            if 'bb_balita' in preview_data.columns:
-                preview_data['bb_balita'] = preview_data['bb_balita'].apply(
-                    lambda x: f"{float(x):.1f} kg" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
-                )
-            
-            if 'tb_balita' in preview_data.columns:
-                preview_data['tb_balita'] = preview_data['tb_balita'].apply(
-                    lambda x: f"{float(x):.1f} cm" if pd.notna(x) and str(x).replace('.','').replace('-','').isdigit() else (str(x) if pd.notna(x) else "N/A")
-                )
-            
-            st.dataframe(
-                preview_data,
-                width='stretch',
-                height=400
-            )
-        else:
-            st.dataframe(
-                df_filtered.head(10),
-                width='stretch',
-                height=400
-            )
-        
-        st.info("ℹ️ **Catatan:** Data pribadi seperti NIK dan Nama tidak ditampilkan untuk menjaga privasi.")
-    
-    st.markdown("---")
-    
-    # Statistik Tambahan
-    st.markdown("### 📈 Statistik Tambahan")
-    
-    stat_col1, stat_col2, stat_col3 = st.columns(3)
-    
-    with stat_col1:
-        st.markdown("**📊 Distribusi Data:**")
-        st.write(f"- **Total Kecamatan Unik:** {df['nama_kecamatan'].nunique()}")
-        st.write(f"- **Total NIK Unik:** {df['nik_balita'].nunique():,}")
-        
-        # Handle umur_balita dengan aman
-        try:
-            umur_valid = df['umur_balita'].dropna()
-            if len(umur_valid) > 0:
-                umur_min = umur_valid.min()
-                umur_max = umur_valid.max()
-                st.write(f"- **Rentang Umur:** {umur_min:.0f} - {umur_max:.0f} bulan")
-            else:
-                st.write(f"- **Rentang Umur:** Data tidak tersedia")
-        except:
-            st.write(f"- **Rentang Umur:** Data tidak valid")
-    
-    with stat_col2:
-        st.markdown("**🎯 Data Quality:**")
-        total_missing = df.isnull().sum().sum()
-        missing_pct = (total_missing / (len(df) * len(df.columns)) * 100)
-        st.write(f"- **Total Missing Values:** {total_missing:,} ({missing_pct:.2f}%)")
-        st.write(f"- **Kelengkapan Data:** {100-missing_pct:.2f}%")
-        complete_rows = len(df.dropna())
-        st.write(f"- **Baris Lengkap:** {complete_rows:,} ({complete_rows/len(df)*100:.1f}%)")
-    
-    with stat_col3:
-        st.markdown("**⚖️ Balance Dataset:**")
-        stunting_count = df["is_stunting"].sum()
-        normal_count = len(df) - stunting_count
-        st.write(f"- **Stunting:** {stunting_count:,} ({stunting_count/len(df)*100:.1f}%)")
-        st.write(f"- **Normal:** {normal_count:,} ({normal_count/len(df)*100:.1f}%)")
-        balance_ratio = min(stunting_count, normal_count) / max(stunting_count, normal_count)
-        st.write(f"- **Balance Ratio:** {balance_ratio:.2f}")
-    
-    st.markdown("---")
-    
-    # Download Options
-    st.markdown("### 💾 Download Data")
-    
-    dl_col1, dl_col2, dl_col3 = st.columns(3)
-    
-    with dl_col1:
-        csv_full = df_filtered.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Data Terfilter (CSV)",
-            data=csv_full,
-            file_name="data_stunting_filtered.csv",
-            mime="text/csv"
-        )
-    
-    with dl_col2:
-        csv_kec = kec_df.to_csv(index=False).encode('utf-8')
-        st.download_button(
-            label="📥 Download Data Kecamatan (CSV)",
-            data=csv_kec,
-            file_name="data_prevalensi_kecamatan.csv",
-            mime="text/csv"
-        )
-    
-    with dl_col3:
-        if len(age_df) > 0:
-            csv_age = age_df.to_csv(index=False).encode('utf-8')
-            st.download_button(
-                label="📥 Download Data Umur (CSV)",
-                data=csv_age,
-                file_name="data_prevalensi_umur.csv",
-                mime="text/csv"
-            )
-        else:
-            st.button(
-                label="📥 Download Data Umur (CSV)",
-                disabled=True
-            )
+st.markdown("""
+<div style='text-align: center; padding: 2rem; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 15px; color: white; margin-top: 2rem;'>
+    <h3 style='margin: 0; color: white;'>📊 Dashboard Stunting Kabupaten Sidoarjo</h3>
+    <p style='margin: 0.5rem 0; opacity: 0.9;'>Monitoring & Evaluasi Kesehatan Balita Berkelanjutan</p>
+    <p style='margin: 0; font-size: 0.9rem; opacity: 0.8;'>© 2025 Dinas Kesehatan Kabupaten Sidoarjo</p>
+</div>
+""", unsafe_allow_html=True)
